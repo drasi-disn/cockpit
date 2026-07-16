@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Remontée d'activité</title>
+<style>
+  :root{
+    --bg: #f5f6fa;
+    --card-bg: #ffffff;
+    --text: #1c2333;
+    --text-soft: #6b7280;
+    --border: #e6e8ee;
+    --shadow: 0 2px 8px rgba(20,24,40,0.06), 0 1px 2px rgba(20,24,40,0.04);
+    --shadow-hover: 0 8px 24px rgba(20,24,40,0.10), 0 2px 6px rgba(20,24,40,0.06);
+    --radius: 18px;
+    --radius-sm: 12px;
+    --accent: #4f6df5;
+
+    --c-projet: #3b6fe0;      --c-projet-bg: #eaf1ff;
+    --c-incident: #e0473b;    --c-incident-bg: #fdeceb;
+    --c-arbitrage: #8a4fe0;   --c-arbitrage-bg: #f2eaff;
+    --c-ssi: #c98a00;         --c-ssi-bg: #fff6e0;
+    --c-info: #1f9d63;        --c-info-bg: #e7f8ef;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #app {
+    max-width: 560px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 20px 20px 32px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Header ---------- */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+  }
+  .header .titles h1 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 2px;
+    letter-spacing: -0.2px;
+  }
+  .header .titles p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-soft);
+    text-transform: capitalize;
+  }
+
+  .person-picker {
+    position: relative;
+  }
+  .person-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 12px 6px 6px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: box-shadow .15s ease, transform .15s ease;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .person-chip:hover { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+  .person-avatar {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .person-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-hover);
+    padding: 6px;
+    min-width: 170px;
+    display: none;
+    z-index: 20;
+  }
+  .person-menu.open { display: block; animation: popIn .12s ease; }
+  .person-menu button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 9px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .person-menu button:hover { background: var(--bg); }
+  .person-menu .empty {
+    padding: 10px;
+    font-size: 12.5px;
+    color: var(--text-soft);
+    font-weight: 500;
+  }
+
+  @keyframes popIn { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  /* ---------- Progress ---------- */
+  .progress-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width .35s cubic-bezier(.4,0,.2,1), background-color .3s ease;
+    width: 50%;
+  }
+
+  /* ---------- Screens ---------- */
+  .screen {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+  }
+  .screen.active {
+    display: flex;
+    animation: fadeSlideIn .28s cubic-bezier(.4,0,.2,1);
+  }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .prompt {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 4px 0 16px;
+    letter-spacing: -0.1px;
+  }
+
+  /* ---------- Category cards ---------- */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .cat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: transform .15s cubic-bezier(.4,0,.2,1), box-shadow .15s ease, border-color .15s ease;
+    text-align: left;
+  }
+  .cat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+  .cat-card:active { transform: translateY(0) scale(.98); }
+  .cat-card .icon-badge {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 21px;
+  }
+  .cat-card .label { font-size: 14.5px; font-weight: 700; }
+  .cat-card .sub { font-size: 11.5px; color: var(--text-soft); font-weight: 500; margin-top: -6px; }
+
+  .cat-card.projet .icon-badge { background: var(--c-projet-bg); }
+  .cat-card.incident .icon-badge { background: var(--c-incident-bg); }
+  .cat-card.arbitrage .icon-badge { background: var(--c-arbitrage-bg); }
+  .cat-card.ssi .icon-badge { background: var(--c-ssi-bg); }
+  .cat-card.information .icon-badge { background: var(--c-info-bg); }
+
+  .cat-card.wide { grid-column: span 2; flex-direction: row; align-items: center; }
+  .cat-card.wide .label { font-size: 15px; }
+
+  /* ---------- Screen 2 : description ---------- */
+  .badge-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .back-btn {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    flex-shrink: 0;
+    transition: transform .12s ease;
+  }
+  .back-btn:hover { transform: translateX(-2px); }
+  .back-btn svg { width: 16px; height: 16px; }
+
+  .cat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px 7px 8px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+  .cat-pill .icon-badge-sm {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    background: rgba(255,255,255,.65);
+  }
+
+  textarea#description {
+    width: 100%;
+    flex: 1;
+    min-height: 160px;
+    resize: none;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    font-size: 15.5px;
+    line-height: 1.5;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--card-bg);
+    box-shadow: var(--shadow);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  textarea#description:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(79,109,245,0.12);
+  }
+  textarea#description::placeholder { color: #a3a9ba; }
+
+  .helper-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-soft);
+  }
+  .ai-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ai-hint .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+
+  .send-btn {
+    margin-top: 18px;
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 15.5px;
+    font-weight: 700;
+    color: white;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: transform .12s cubic-bezier(.4,0,.2,1), box-shadow .15s ease, opacity .15s ease;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .send-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .send-btn:not(:disabled):hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+  .send-btn:not(:disabled):active { transform: translateY(0) scale(.98); }
+  .send-btn .spinner {
+    width: 16px; height: 16px;
+    border: 2.5px solid rgba(255,255,255,.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: none;
+  }
+  .send-btn.loading .spinner { display: inline-block; }
+  .send-btn.loading .send-label { opacity: .7; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .kbd-hint { text-align: center; margin-top: 12px; font-size: 11.5px; color: var(--text-soft); }
+  .kbd-hint kbd {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1.5px 6px;
+    font-family: inherit;
+    font-size: 11px;
+  }
+
+  /* ---------- Screen 3 : success ---------- */
+  .success-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 6px;
+  }
+  .success-circle {
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    background: var(--c-info-bg);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 18px;
+    animation: popIn .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  .success-circle svg { width: 40px; height: 40px; }
+  .success-circle svg path {
+    stroke: var(--c-info);
+    stroke-width: 3;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    animation: draw .45s ease .15s forwards;
+  }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  .success-wrap h2 { font-size: 19px; margin: 0 0 4px; font-weight: 700; }
+  .success-wrap p { margin: 0; font-size: 13.5px; color: var(--text-soft); }
+
+  .again-btn {
+    margin-top: 22px;
+    background: none;
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    padding: 10px 20px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color .15s ease, transform .12s ease;
+  }
+  .again-btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+  /* ---------- Error toast ---------- */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: #2a2f3d;
+    color: white;
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+    max-width: 90%;
+    text-align: center;
+    z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 380px) {
+    .card-grid { grid-template-columns: 1fr; }
+    .cat-card.wide { grid-column: span 1; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="header">
+    <div class="titles">
+      <h1>Remontée d'activité</h1>
+      <p id="todayLabel">Aujourd'hui</p>
+    </div>
+    <div class="person-picker">
+      <div class="person-chip" id="personChip">
+        <span class="person-avatar" id="personAvatar">?</span>
+        <span id="personName">Qui es-tu ?</span>
+      </div>
+      <div class="person-menu" id="personMenu"></div>
+    </div>
+  </div>
+
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <!-- SCREEN 1 : catégories -->
+  <div class="screen active" id="screen1">
+    <div class="prompt">Que souhaites-tu signaler ?</div>
+    <div class="card-grid" id="cardGrid"></div>
+  </div>
+
+  <!-- SCREEN 2 : description -->
+  <div class="screen" id="screen2">
+    <div class="badge-row">
+      <div class="back-btn" id="backBtn" title="Changer de catégorie">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="cat-pill" id="catPill"></div>
+    </div>
+    <div class="prompt" id="descPrompt">Décris simplement le sujet</div>
+    <textarea id="description" placeholder="Écris comme tu le dirais à voix haute…"></textarea>
+    <div class="helper-row">
+      <span class="ai-hint"><span class="dot"></span> L'IA structure automatiquement ta remontée</span>
+      <span id="charCount">0</span>
+    </div>
+    <button class="send-btn" id="sendBtn" disabled>
+      <span class="spinner"></span>
+      <span class="send-label">Envoyer</span>
+    </button>
+    <div class="kbd-hint">Astuce : <kbd>Ctrl</kbd> + <kbd>Entrée</kbd> pour envoyer</div>
+  </div>
+
+  <!-- SCREEN 3 : succès -->
+  <div class="screen" id="screen3">
+    <div class="success-wrap">
+      <div class="success-circle">
+        <svg viewBox="0 0 24 24"><path d="M4 12.5l5 5.5L20 6"/></svg>
+      </div>
+      <h2 id="successTitle">C'est transmis !</h2>
+      <p id="successSub">Merci, ta remontée est enregistrée.</p>
+      <button class="again-btn" id="againBtn">Signaler autre chose</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // Configuration : catégories affichées + mapping vers la colonne
+  // "Nature" (Choice) de la table Activite_Poles :
+  //   exploitation | incident | projet | risque | arbitrage | info
+  // ---------------------------------------------------------------
+  var CATEGORIES = [
+    { id: "Projet",      nature: "projet",    label: "Projet",      icon: "📁", cls: "projet",     sub: "Avancement, retard, jalon",
+      placeholder: "Où en est le projet ? Qu'est-ce qui a changé ?" },
+    { id: "Incident",    nature: "incident",  label: "Incident",    icon: "🚨", cls: "incident",   sub: "Panne, blocage, urgence",
+      placeholder: "Que s'est-il passé ? Quel est l'impact ?" },
+    { id: "Arbitrage",   nature: "arbitrage", label: "Arbitrage",   icon: "⚖️", cls: "arbitrage",  sub: "Décision à prendre",
+      placeholder: "Quelle décision faut-il prendre, et pourquoi ?" },
+    { id: "SSI",         nature: "risque",    label: "SSI",         icon: "🔒", cls: "ssi",        sub: "Sécurité, risque cyber",
+      placeholder: "Quelle est l'alerte ou le risque sécurité ?" },
+    { id: "Information", nature: "info",      label: "Information", icon: "💡", cls: "information", sub: "Simple partage",
+      placeholder: "Quelle information veux-tu partager ?" }
+  ];
+
+  // Repli si l'appel à la table Agents échoue (ne devrait pas arriver
+  // en usage normal dans Grist, mais évite un écran bloqué).
+  var FALLBACK_PEOPLE = [
+    { id: null, name: "Laurent" },
+    { id: null, name: "Christophe" }
+  ];
+
+  var STORAGE_KEY = "activitePoles.adjointId";
+
+  // ---------------------------------------------------------------
+  // État
+  // ---------------------------------------------------------------
+  var state = {
+    person: null,      // { id: rowId, name: "Laurent" }
+    category: null,
+    sending: false
+  };
+  var PEOPLE = [];
+
+  // ---------------------------------------------------------------
+  // DOM refs
+  // ---------------------------------------------------------------
+  var $ = function (id) { return document.getElementById(id); };
+  var screen1 = $("screen1"), screen2 = $("screen2"), screen3 = $("screen3");
+  var progressFill = $("progressFill");
+  var cardGrid = $("cardGrid");
+  var catPill = $("catPill");
+  var descPrompt = $("descPrompt");
+  var descriptionEl = $("description");
+  var charCount = $("charCount");
+  var sendBtn = $("sendBtn");
+  var backBtn = $("backBtn");
+  var againBtn = $("againBtn");
+  var personChip = $("personChip");
+  var personMenu = $("personMenu");
+  var personName = $("personName");
+  var personAvatar = $("personAvatar");
+  var successTitle = $("successTitle");
+  var successSub = $("successSub");
+
+  // ---------------------------------------------------------------
+  // Date du jour, en français
+  // ---------------------------------------------------------------
+  try {
+    var today = new Date();
+    var fmt = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+    $("todayLabel").textContent = "Aujourd'hui · " + fmt.format(today);
+  } catch (e) { /* garde "Aujourd'hui" par défaut */ }
+
+  // ---------------------------------------------------------------
+  // Semaine ISO (ex: "2026-S29"), pour recoupement avec Reporting_Hebdo
+  // ---------------------------------------------------------------
+  function isoWeekLabel(d) {
+    var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    var yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    var weekNo = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
+    return date.getUTCFullYear() + "-S" + (weekNo < 10 ? "0" + weekNo : weekNo);
+  }
+
+  function genActiviteId() {
+    return "ACT-" + Date.now().toString(36).toUpperCase();
+  }
+
+  // ---------------------------------------------------------------
+  // Sélecteur de personne — chargé dynamiquement depuis la table Agents
+  // ---------------------------------------------------------------
+  function renderPersonMenu() {
+    personMenu.innerHTML = "";
+    if (!PEOPLE.length) {
+      var empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "Aucun agent trouvé";
+      personMenu.appendChild(empty);
+      return;
+    }
+    PEOPLE.forEach(function (p) {
+      var btn = document.createElement("button");
+      btn.textContent = p.name;
+      btn.addEventListener("click", function () {
+        setPerson(p);
+        personMenu.classList.remove("open");
+      });
+      personMenu.appendChild(btn);
+    });
+  }
+
+  function setPerson(p) {
+    state.person = p;
+    if (p.id != null) { localStorage.setItem(STORAGE_KEY, String(p.id)); }
+    personName.textContent = p.name.split(" ")[0];
+    personAvatar.textContent = p.name.charAt(0).toUpperCase();
+  }
+
+  function restoreSavedPerson() {
+    var savedId = localStorage.getItem(STORAGE_KEY);
+    if (!savedId) { return; }
+    var match = PEOPLE.filter(function (p) { return String(p.id) === savedId; })[0];
+    if (match) { setPerson(match); }
+  }
+
+  function loadAgents() {
+    if (!window.grist || !grist.docApi || !grist.docApi.fetchTable) {
+      PEOPLE = FALLBACK_PEOPLE;
+      renderPersonMenu();
+      return;
+    }
+    grist.docApi.fetchTable("Agents").then(function (data) {
+      var ids = data.id || [];
+      var noms = data.Nom || [];
+      var actifs = data.Actif || [];
+      PEOPLE = ids
+        .map(function (rowId, i) { return { id: rowId, name: noms[i], actif: actifs[i] !== false }; })
+        .filter(function (p) { return p.actif && p.name; });
+      if (!PEOPLE.length) { PEOPLE = FALLBACK_PEOPLE; }
+      renderPersonMenu();
+      restoreSavedPerson();
+    }).catch(function () {
+      PEOPLE = FALLBACK_PEOPLE;
+      renderPersonMenu();
+    });
+  }
+
+  personChip.addEventListener("click", function (e) {
+    e.stopPropagation();
+    personMenu.classList.toggle("open");
+  });
+  document.addEventListener("click", function () { personMenu.classList.remove("open"); });
+
+  // ---------------------------------------------------------------
+  // Écran 1 : cartes de catégories
+  // ---------------------------------------------------------------
+  function renderCards() {
+    cardGrid.innerHTML = "";
+    CATEGORIES.forEach(function (cat) {
+      var card = document.createElement("div");
+      card.className = "cat-card " + cat.cls;
+      card.innerHTML =
+        '<span class="icon-badge">' + cat.icon + '</span>' +
+        '<span class="label">' + cat.label + '</span>' +
+        '<span class="sub">' + cat.sub + '</span>';
+      card.addEventListener("click", function () { selectCategory(cat); });
+      cardGrid.appendChild(card);
+    });
+  }
+
+  function selectCategory(cat) {
+    state.category = cat;
+    catPill.innerHTML =
+      '<span class="icon-badge-sm">' + cat.icon + '</span><span>' + cat.label + '</span>';
+    catPill.style.background = getComputedStyle(document.documentElement).getPropertyValue("--c-" + cssKey(cat.cls) + "-bg");
+    catPill.style.color = getComputedStyle(document.documentElement).getPropertyValue("--c-" + cssKey(cat.cls));
+    descPrompt.textContent = "Décris simplement le sujet";
+    descriptionEl.placeholder = cat.placeholder;
+    descriptionEl.value = "";
+    updateCharCount();
+    goToScreen(2);
+    setTimeout(function () { descriptionEl.focus(); }, 250);
+  }
+
+  function cssKey(cls) { return cls === "information" ? "info" : cls; }
+
+  // ---------------------------------------------------------------
+  // Navigation entre écrans
+  // ---------------------------------------------------------------
+  function goToScreen(n) {
+    [screen1, screen2, screen3].forEach(function (s) { s.classList.remove("active"); });
+    if (n === 1) { screen1.classList.add("active"); progressFill.style.width = "8%"; }
+    if (n === 2) { screen2.classList.add("active"); progressFill.style.width = "55%"; }
+    if (n === 3) { screen3.classList.add("active"); progressFill.style.width = "100%"; }
+  }
+
+  backBtn.addEventListener("click", function () { goToScreen(1); });
+
+  // ---------------------------------------------------------------
+  // Écran 2 : saisie
+  // ---------------------------------------------------------------
+  function updateCharCount() {
+    var len = descriptionEl.value.trim().length;
+    charCount.textContent = len + " caractère" + (len > 1 ? "s" : "");
+    sendBtn.disabled = len < 6 || state.sending;
+  }
+  descriptionEl.addEventListener("input", updateCharCount);
+  descriptionEl.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !sendBtn.disabled) {
+      submitEntry();
+    }
+  });
+  sendBtn.addEventListener("click", submitEntry);
+
+  function showToast(msg) {
+    var t = document.querySelector(".toast");
+    if (!t) {
+      t = document.createElement("div");
+      t.className = "toast";
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    requestAnimationFrame(function () { t.classList.add("show"); });
+    setTimeout(function () { t.classList.remove("show"); }, 3200);
+  }
+
+  // ---------------------------------------------------------------
+  // Envoi vers Grist — table Activite_Poles
+  // ---------------------------------------------------------------
+  function submitEntry() {
+    var text = descriptionEl.value.trim();
+    if (!text || !state.category) { return; }
+    if (!state.person || state.person.id == null) {
+      showToast("Choisis d'abord qui tu es, en haut à droite.");
+      personMenu.classList.add("open");
+      return;
+    }
+
+    state.sending = true;
+    sendBtn.classList.add("loading");
+    sendBtn.disabled = true;
+
+    var now = new Date();
+    var record = {
+      Activite_ID: genActiviteId(),
+      Date_remontee: Math.floor(now.getTime() / 1000),
+      Semaine: isoWeekLabel(now),
+      Nature: state.category.nature,
+      Objet: text.length > 80 ? text.slice(0, 77) + "…" : text,
+      Description_courte: text,
+      Statut: "signalé",
+      Traite: false,
+      IA_enrichi: false,
+      Adjoint: state.person.id
+    };
+
+    Promise.resolve()
+      .then(function () { return grist.getTable(); })
+      .then(function (table) { return table.create({ fields: record }); })
+      .then(function () {
+        state.sending = false;
+        sendBtn.classList.remove("loading");
+        successTitle.textContent = "C'est transmis !";
+        successSub.textContent = "Merci " + state.person.name.split(" ")[0] + ", à bientôt.";
+        goToScreen(3);
+        setTimeout(function () {
+          goToScreen(1);
+          sendBtn.disabled = true;
+        }, 2200);
+      })
+      .catch(function (err) {
+        state.sending = false;
+        sendBtn.classList.remove("loading");
+        sendBtn.disabled = false;
+        console.error(err);
+        showToast("Oups, l'envoi a échoué. Réessaie.");
+      });
+  }
+
+  againBtn.addEventListener("click", function () { goToScreen(1); });
+
+  // ---------------------------------------------------------------
+  // Init
+  // ---------------------------------------------------------------
+  renderCards();
+  goToScreen(1);
+  loadAgents();
+
+  if (window.grist) {
+    grist.ready({ requiredAccess: "full" });
+  }
+})();
+</script>
+</body>
+</html>
