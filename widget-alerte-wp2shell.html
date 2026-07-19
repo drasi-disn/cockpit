@@ -105,6 +105,11 @@
   .instance-ring.done{background:var(--ok);}
   .instance-ring.na{background:#5B8DEF;}
   .empty-state{padding:22px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  #add-status{
+    display:none;padding:10px 16px;font-size:12.5px;border-bottom:1px solid var(--line);
+  }
+  #add-status.error{display:block;background:var(--crit-dim);color:#ff9aa4;}
+  #add-status.info{display:block;background:var(--panel-2);color:var(--muted);}
 
   .path{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
   .path-title{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
@@ -251,6 +256,7 @@
       <button id="add-confirm" type="button">Créer</button>
       <button id="add-cancel" type="button">Annuler</button>
     </div>
+    <div id="add-status"></div>
     <ul class="instance-list" id="instance-list"></ul>
     <div class="empty-state" id="empty-state">Aucune instance pour l'instant — ajoutez-en une pour commencer le suivi.</div>
   </div>
@@ -409,6 +415,7 @@
   const newAgentInput = document.getElementById('new-agent');
   const addConfirm = document.getElementById('add-confirm');
   const addCancel = document.getElementById('add-cancel');
+  const addStatus = document.getElementById('add-status');
   const searchInput = document.getElementById('search-input');
   const gatePill = document.getElementById('gate-pill');
   const notesEl = document.getElementById('notes');
@@ -560,10 +567,15 @@
     saveTimer = setTimeout(() => saveField('Notes', notesEl.value), 600);
   });
 
-  addBtn.addEventListener('click', () => { addForm.classList.add('open'); newSiteInput.focus(); });
+  addBtn.addEventListener('click', () => {
+    addForm.classList.add('open');
+    addStatus.className = ''; addStatus.textContent = '';
+    newSiteInput.focus();
+  });
   searchInput.addEventListener('input', renderList);
   addCancel.addEventListener('click', () => {
     addForm.classList.remove('open');
+    addStatus.className = ''; addStatus.textContent = '';
     newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
   });
 
@@ -573,6 +585,8 @@
     const agent = newAgentInput.value.trim();
     if (!site) { newSiteInput.focus(); return; }
     const fields = { Site: site, URL: url, Agent: agent };
+    addStatus.className = 'info';
+    addStatus.textContent = 'Création en cours…';
 
     if (gristConnected) {
       grist.selectedTable.create({ fields })
@@ -581,10 +595,12 @@
           records.push(Object.assign({ id: newId }, fields));
           addForm.classList.remove('open');
           newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
+          addStatus.className = ''; addStatus.textContent = '';
           selectInstance(newId);
         })
         .catch(err => {
-          saveHint.textContent = 'Échec de la création.';
+          addStatus.className = 'error';
+          addStatus.textContent = "Échec de la création — l'accès est probablement en lecture seule. Demande à ce que le rôle d'accès public (ou ton compte) soit réglé sur « Éditeur » dans les paramètres de partage du document.";
           console.error(err);
         });
     } else {
@@ -592,6 +608,7 @@
       records.push(Object.assign({ id }, fields));
       addForm.classList.remove('open');
       newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
+      addStatus.className = ''; addStatus.textContent = '';
       selectInstance(id);
     }
   }
