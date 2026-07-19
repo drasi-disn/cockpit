@@ -41,6 +41,10 @@
   #status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none;transition:background .2s;}
   #status-dot.live{background:var(--ok);box-shadow:0 0 6px var(--ok);}
   #status-dot.demo{background:var(--warn);}
+  #save-toast{margin-left:auto;font-weight:600;transition:opacity .3s;opacity:0;}
+  #save-toast.show{opacity:1;}
+  #save-toast.ok{color:var(--ok);}
+  #save-toast.err{color:var(--crit);}
 
   .wrap{max-width:760px;margin:0 auto;padding:22px 20px 60px;}
 
@@ -219,6 +223,7 @@
 <div id="status-bar">
   <span id="status-dot"></span>
   <span id="status-text">Connexion au document Grist…</span>
+  <span id="save-toast"></span>
 </div>
 
 <div class="wrap">
@@ -303,8 +308,8 @@
         <label for="status-field">Statut de vulnérabilité</label>
         <select id="status-field">
           <option value="">À évaluer</option>
-          <option value="vulnerable">Vulnérable — plan de remédiation à suivre</option>
-          <option value="non_vulnerable">Non vulnérable — version saine, rien à faire</option>
+          <option value="Vulnérable">Vulnérable — plan de remédiation à suivre</option>
+          <option value="Non vulnérable">Non vulnérable — version saine, rien à faire</option>
         </select>
       </div>
     </div>
@@ -436,7 +441,7 @@
   let demoAutoId = 1;
 
   function pctForRecord(r){
-    if (r.Statut === 'non_vulnerable') return 100;
+    if (r.Statut === 'Non vulnérable') return 100;
     const done = FIELD_KEYS.filter(k => !!r[k]).length;
     return Math.round((done / FIELD_KEYS.length) * 100);
   }
@@ -469,8 +474,8 @@
       const pct = pctForRecord(r);
       const li = document.createElement('li');
       li.className = 'instance-item' + (r.id === selectedId ? ' selected' : '');
-      const ringClass = r.Statut === 'non_vulnerable' ? 'na' : (pct === 100 ? 'done' : (pct > 0 ? 'some' : ''));
-      const pctLabel = r.Statut === 'non_vulnerable' ? 'N/A' : (pct + ' %');
+      const ringClass = r.Statut === 'Non vulnérable' ? 'na' : (pct === 100 ? 'done' : (pct > 0 ? 'some' : ''));
+      const pctLabel = r.Statut === 'Non vulnérable' ? 'N/A' : (pct + ' %');
       li.innerHTML =
         '<span class="instance-ring ' + ringClass + '"></span>' +
         '<span class="instance-name">' + escapeHtml(r.Site || '(sans nom)') +
@@ -508,7 +513,7 @@
   }
 
   function applyStatusView(status){
-    const isNa = status === 'non_vulnerable';
+    const isNa = status === 'Non vulnérable';
     naBanner.classList.toggle('hidden', !isNa);
     remediationBlocks.classList.toggle('hidden', isNa);
   }
@@ -537,14 +542,27 @@
     if (r) Object.assign(r, fields);
   }
 
+  const saveToast = document.getElementById('save-toast');
+  let toastTimer = null;
+  function flashToast(ok, msg){
+    clearTimeout(toastTimer);
+    saveToast.textContent = (ok ? '✓ ' : '✗ ') + msg;
+    saveToast.className = (ok ? 'ok' : 'err') + ' show';
+    toastTimer = setTimeout(() => { saveToast.className = saveToast.className.replace(' show', ''); }, ok ? 2500 : 6000);
+  }
+
   function saveField(field, value){
     if (selectedId == null) return;
     patchLocalRecord(selectedId, { [field]: value });
     renderList();
-    if (!gristConnected) { saveHint.textContent = 'Mode démo — non enregistré.'; return; }
+    if (!gristConnected) { saveHint.textContent = 'Mode démo — non enregistré.'; flashToast(false, 'Mode démo — non enregistré.'); return; }
     grist.selectedTable.update({ id: selectedId, fields: { [field]: value } })
-      .then(() => { saveHint.textContent = 'Enregistré dans Grist.'; })
-      .catch(err => { saveHint.textContent = "Échec de l'enregistrement."; console.error(err); });
+      .then(() => { saveHint.textContent = 'Enregistré dans Grist.'; flashToast(true, 'Enregistré dans Grist.'); })
+      .catch(err => {
+        saveHint.textContent = "Échec de l'enregistrement.";
+        flashToast(false, "Échec — vérifie que ton accès est en Éditeur, pas Lecteur.");
+        console.error(err);
+      });
   }
 
   checkItems.forEach(item => {
@@ -596,11 +614,13 @@
           addForm.classList.remove('open');
           newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
           addStatus.className = ''; addStatus.textContent = '';
+          flashToast(true, 'Instance créée dans Grist.');
           selectInstance(newId);
         })
         .catch(err => {
           addStatus.className = 'error';
           addStatus.textContent = "Échec de la création — l'accès est probablement en lecture seule. Demande à ce que le rôle d'accès public (ou ton compte) soit réglé sur « Éditeur » dans les paramètres de partage du document.";
+          flashToast(false, "Échec — vérifie que ton accès est en Éditeur, pas Lecteur.");
           console.error(err);
         });
     } else {
