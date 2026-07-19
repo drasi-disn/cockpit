@@ -239,7 +239,7 @@
       <div class="arrow">→</div>
       <div class="node rce">Exécution de code</div>
       <div class="gate">
-        <div class="gate-label">Blocage WAF</div>
+        <div class="gate-label">Blocage reverse proxy</div>
         <div class="gate-pill" id="gate-pill">à activer</div>
       </div>
     </div>
@@ -304,15 +304,15 @@
     <div class="section">
       <div class="sec-head warn"><div class="sec-num">3</div><div class="sec-title">Mesures temporaires si la mise à jour est impossible</div></div>
       <div class="sec-body">
-        <p>À appliquer sur l'instance si elle est exposée à Internet, jusqu'au patch.</p>
+        <p>Pas de WAF disponible : ces mesures s'appliquent au niveau du reverse proxy, sur l'instance si elle est exposée à Internet, jusqu'au patch.</p>
         <ul class="checklist">
           <li class="check-item" data-field="WAFBlocagePath">
             <input type="checkbox">
-            <div class="ct"><b>Bloquer <code class="inline">/wp-json/batch/v1</code></b><span>Au niveau WAF / reverse proxy / pare-feu applicatif.</span></div>
+            <div class="ct"><b>Bloquer <code class="inline">/wp-json/batch/v1</code></b><span>Au niveau du reverse proxy.</span></div>
           </li>
           <li class="check-item" data-field="WAFBlocageQuery">
             <input type="checkbox">
-            <div class="ct"><b>Bloquer <code class="inline">?rest_route=/batch/v1</code></b><span>Les deux formes de la requête doivent être filtrées.</span></div>
+            <div class="ct"><b>Bloquer <code class="inline">?rest_route=/batch/v1</code></b><span>Au niveau du reverse proxy — les deux formes de la requête doivent être filtrées.</span></div>
           </li>
           <li class="check-item" data-field="RestApiRestreinte">
             <input type="checkbox">
