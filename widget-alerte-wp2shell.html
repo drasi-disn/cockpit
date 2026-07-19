@@ -73,6 +73,14 @@
   }
   #add-btn:hover{filter:brightness(1.08);}
 
+  #search-row{padding:10px 16px;border-bottom:1px solid var(--line);}
+  #search-input{
+    width:100%;background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+    border-radius:7px;padding:8px 10px;font-family:'Inter',sans-serif;font-size:13px;
+  }
+  #search-input:focus{outline:none;border-color:var(--ok);}
+  .no-match{padding:16px;text-align:center;color:var(--muted);font-size:12.5px;}
+
   #add-form{display:none;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel-2);flex-wrap:wrap;}
   #add-form.open{display:flex;}
   #add-form input{
@@ -219,6 +227,9 @@
         <div class="instances-count" id="instances-count">0 instance</div>
       </div>
       <button id="add-btn" type="button">+ Ajouter une instance</button>
+    </div>
+    <div id="search-row">
+      <input id="search-input" type="text" placeholder="🔍 Rechercher par site ou par agent…">
     </div>
     <div id="add-form">
       <input id="new-site" type="text" placeholder="Nom du site (ex. Intranet Rectorat)">
@@ -371,6 +382,7 @@
   const newAgentInput = document.getElementById('new-agent');
   const addConfirm = document.getElementById('add-confirm');
   const addCancel = document.getElementById('add-cancel');
+  const searchInput = document.getElementById('search-input');
   const gatePill = document.getElementById('gate-pill');
   const notesEl = document.getElementById('notes');
   const saveHint = document.getElementById('save-hint');
@@ -398,10 +410,24 @@
   function renderList(){
     instanceListEl.innerHTML = '';
     instancesCountEl.textContent = records.length + (records.length > 1 ? ' instances' : ' instance');
+
+    const q = searchInput.value.trim().toLowerCase();
+    const visible = q
+      ? records.filter(r => (r.Site || '').toLowerCase().includes(q) || (r.Agent || '').toLowerCase().includes(q) || (r.URL || '').toLowerCase().includes(q))
+      : records;
+
     emptyStateEl.style.display = records.length ? 'none' : 'block';
     instanceListEl.style.display = records.length ? 'block' : 'none';
 
-    records.forEach(r => {
+    if (records.length && q && !visible.length) {
+      const li = document.createElement('li');
+      li.className = 'no-match';
+      li.textContent = 'Aucune instance ne correspond à « ' + searchInput.value.trim() + ' ».';
+      instanceListEl.appendChild(li);
+      return;
+    }
+
+    visible.forEach(r => {
       const pct = pctForRecord(r);
       const li = document.createElement('li');
       li.className = 'instance-item' + (r.id === selectedId ? ' selected' : '');
@@ -490,6 +516,7 @@
   });
 
   addBtn.addEventListener('click', () => { addForm.classList.add('open'); newSiteInput.focus(); });
+  searchInput.addEventListener('input', renderList);
   addCancel.addEventListener('click', () => {
     addForm.classList.remove('open');
     newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
