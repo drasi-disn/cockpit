@@ -223,6 +223,7 @@
     <div id="add-form">
       <input id="new-site" type="text" placeholder="Nom du site (ex. Intranet Rectorat)">
       <input id="new-url" type="text" placeholder="URL (ex. intranet.ac-xxx.fr)">
+      <input id="new-agent" type="text" placeholder="Votre nom (agent en charge)">
       <button id="add-confirm" type="button">Créer</button>
       <button id="add-cancel" type="button">Annuler</button>
     </div>
@@ -367,6 +368,7 @@
   const addForm = document.getElementById('add-form');
   const newSiteInput = document.getElementById('new-site');
   const newUrlInput = document.getElementById('new-url');
+  const newAgentInput = document.getElementById('new-agent');
   const addConfirm = document.getElementById('add-confirm');
   const addCancel = document.getElementById('add-cancel');
   const gatePill = document.getElementById('gate-pill');
@@ -407,7 +409,7 @@
       li.innerHTML =
         '<span class="instance-ring ' + ringClass + '"></span>' +
         '<span class="instance-name">' + escapeHtml(r.Site || '(sans nom)') +
-          (r.URL ? '<span class="url">' + escapeHtml(r.URL) + '</span>' : '') +
+          (r.URL ? '<span class="url">' + escapeHtml(r.URL) + (r.Agent ? ' · ' + escapeHtml(r.Agent) : '') + '</span>' : (r.Agent ? '<span class="url">' + escapeHtml(r.Agent) + '</span>' : '')) +
         '</span>' +
         '<span class="instance-pct">' + pct + ' %</span>';
       li.addEventListener('click', () => selectInstance(r.id));
@@ -490,14 +492,15 @@
   addBtn.addEventListener('click', () => { addForm.classList.add('open'); newSiteInput.focus(); });
   addCancel.addEventListener('click', () => {
     addForm.classList.remove('open');
-    newSiteInput.value = ''; newUrlInput.value = '';
+    newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
   });
 
   function createInstance(){
     const site = newSiteInput.value.trim();
     const url = newUrlInput.value.trim();
+    const agent = newAgentInput.value.trim();
     if (!site) { newSiteInput.focus(); return; }
-    const fields = { Site: site, URL: url };
+    const fields = { Site: site, URL: url, Agent: agent };
 
     if (gristConnected) {
       grist.selectedTable.create({ fields })
@@ -505,7 +508,7 @@
           const newId = Array.isArray(res) ? res[0].id : res.id;
           records.push(Object.assign({ id: newId }, fields));
           addForm.classList.remove('open');
-          newSiteInput.value = ''; newUrlInput.value = '';
+          newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
           selectInstance(newId);
         })
         .catch(err => {
@@ -516,13 +519,14 @@
       const id = 'demo-' + (demoAutoId++);
       records.push(Object.assign({ id }, fields));
       addForm.classList.remove('open');
-      newSiteInput.value = ''; newUrlInput.value = '';
+      newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
       selectInstance(id);
     }
   }
   addConfirm.addEventListener('click', createInstance);
   newUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
   newSiteInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
+  newAgentInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
 
   if (window.grist) {
     grist.ready({
