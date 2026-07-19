@@ -663,7 +663,7 @@
       statusDot.className = 'live';
       statusText.textContent = 'Connecté au document Grist — création et modifications enregistrées automatiquement.';
 
-      records = recs.map(r => Object.assign({ id: r.id }, grist.mapColumnNames(r, mappings) || r));
+      records = recs.map(r => Object.assign({ id: r.id }, r, grist.mapColumnNames(r, mappings) || {}));
       if (!records.find(r => r.id === selectedId)) {
         selectedId = records.length ? records[0].id : null;
       }
