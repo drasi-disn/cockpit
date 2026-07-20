@@ -775,7 +775,15 @@
   newSiteInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
   newAgentInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
 
+  const debugLines = [];
+  function debugLog(msg){
+    debugLines.push('[' + new Date().toISOString().slice(11,19) + '] ' + msg);
+    const debugEl = document.getElementById('debug-info');
+    if (debugEl) debugEl.textContent = debugLines.join('\n');
+  }
+
   if (window.grist) {
+    debugLog('window.grist détecté, appel grist.ready()…');
     grist.ready({
       columns: [
         { name: 'Vulnerabilite', title: 'Vulnérabilité' },
@@ -789,39 +797,48 @@
       ],
       requiredAccess: 'full'
     });
+    debugLog('grist.ready() appelé. Lancement loadVulnDefs()…');
 
-    loadVulnDefs().then(() => {
-      grist.onRecords(function (recs, mappings) {
-        gristConnected = true;
-        statusDot.className = 'live';
-        statusText.textContent = 'Connecté au document Grist — création et modifications enregistrées automatiquement.';
+    loadVulnDefs()
+      .then(() => {
+        debugLog('loadVulnDefs() résolu. vulnList=' + JSON.stringify(vulnList) + '. Inscription à grist.onRecords()…');
 
-        records = recs.map(r => {
-          const mapped = grist.mapColumnNames(r, mappings) || {};
-          const rec = Object.assign({ id: r.id }, r, mapped);
-          const rawBefore = rec.Vulnerabilite;
-          rec.Vulnerabilite = normalizeRef(rec.Vulnerabilite);
-          rec.__debugRaw = rawBefore;
-          return rec;
-        });
-        if (!records.find(r => r.id === selectedId)) {
-          selectedId = null;
-          detailEl.classList.add('hidden');
-        }
-        renderList();
-        if (selectedId != null) selectInstance(selectedId);
+        grist.onRecords(function (recs, mappings) {
+          debugLog('onRecords() DÉCLENCHÉ — ' + (recs ? recs.length : 'null') + ' lignes reçues du widget.');
+          gristConnected = true;
+          statusDot.className = 'live';
+          statusText.textContent = 'Connecté au document Grist — création et modifications enregistrées automatiquement.';
 
-        const debugEl = document.getElementById('debug-info');
-        if (debugEl) {
-          const lines = ['DEBUG — ' + records.length + ' lignes reçues. currentVulnId=' + JSON.stringify(currentVulnId) + ' (' + typeof currentVulnId + ')'];
-          records.slice(0, 10).forEach(r => {
-            lines.push('  id=' + r.id + '  Vulnerabilite normalisé=' + JSON.stringify(r.Vulnerabilite) + ' (' + typeof r.Vulnerabilite + ')  brut=' + JSON.stringify(r.__debugRaw) + ' (' + typeof r.__debugRaw + ')');
+          records = recs.map(r => {
+            const mapped = grist.mapColumnNames(r, mappings) || {};
+            const rec = Object.assign({ id: r.id }, r, mapped);
+            const rawBefore = rec.Vulnerabilite;
+            rec.Vulnerabilite = normalizeRef(rec.Vulnerabilite);
+            rec.__debugRaw = rawBefore;
+            return rec;
           });
-          debugEl.textContent = lines.join('\n');
-        }
+          if (!records.find(r => r.id === selectedId)) {
+            selectedId = null;
+            detailEl.classList.add('hidden');
+          }
+          renderList();
+          if (selectedId != null) selectInstance(selectedId);
+
+          const detail = ['currentVulnId=' + JSON.stringify(currentVulnId) + ' (' + typeof currentVulnId + ')'];
+          records.slice(0, 10).forEach(r => {
+            detail.push('  id=' + r.id + '  Vulnerabilite=' + JSON.stringify(r.Vulnerabilite) + ' (' + typeof r.Vulnerabilite + ')  brut=' + JSON.stringify(r.__debugRaw));
+          });
+          debugLog(detail.join('\n'));
+        });
+
+        debugLog('grist.onRecords() inscrit avec succès (en attente du premier envoi de données par Grist).');
+      })
+      .catch(err => {
+        debugLog('ERREUR pendant loadVulnDefs() : ' + (err && err.message ? err.message : JSON.stringify(err)));
+        console.error(err);
       });
-    });
   } else {
+    debugLog('window.grist est absent — le widget ne tourne pas dans Grist (mode démo).');
     statusDot.className = 'demo';
     statusText.textContent = 'Mode démo (hors Grist) — aperçu uniquement, rien n\'est enregistré.';
     vulnDefs = {};
