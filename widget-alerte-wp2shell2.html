@@ -395,6 +395,25 @@
     try { const v = JSON.parse(s); return v == null ? fallback : v; } catch (e) { return fallback; }
   }
 
+  // Normalise une valeur de colonne Reference reçue de l'API Grist, quelle
+  // que soit sa forme : nombre brut, {value: rowId}, {rowId}, ou l'encodage
+  // CellValue brut ['R', tableId, rowId].
+  function normalizeRef(v){
+    if (v == null) return null;
+    if (typeof v === 'number') return v;
+    if (Array.isArray(v)) {
+      if (v[0] === 'R' && v.length >= 3) return v[2];
+      return null;
+    }
+    if (typeof v === 'object') {
+      if ('value' in v) return normalizeRef(v.value);
+      if ('rowId' in v) return v.rowId;
+      return null;
+    }
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
@@ -764,7 +783,7 @@
         { name: 'VersionActuelle', title: 'Version actuelle', optional: true },
         { name: 'Agent', title: 'Agent en charge', optional: true },
         { name: 'Statut', title: 'Statut vulnérabilité', optional: true },
-         { name: 'ChecklistEtatJSON', title: 'État checklist (JSON)', optional: true },
+        { name: 'ChecklistEtatJSON', title: 'État checklist (JSON)', optional: true },
         { name: 'Notes', title: 'Notes', optional: true },
       ],
       requiredAccess: 'full'
@@ -779,9 +798,7 @@
         records = recs.map(r => {
           const mapped = grist.mapColumnNames(r, mappings) || {};
           const rec = Object.assign({ id: r.id }, r, mapped);
-          if (rec.Vulnerabilite && typeof rec.Vulnerabilite === 'object' && 'value' in rec.Vulnerabilite) {
-            rec.Vulnerabilite = rec.Vulnerabilite.value;
-          }
+          rec.Vulnerabilite = normalizeRef(rec.Vulnerabilite);
           return rec;
         });
         if (!records.find(r => r.id === selectedId)) {
