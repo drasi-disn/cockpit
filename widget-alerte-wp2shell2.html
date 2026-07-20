@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alerte wp2shell — Suivi de remédiation</title>
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0B1220;
+    --panel:#121B2E;
+    --panel-2:#182338;
+    --line:#243350;
+    --text:#E8EDF5;
+    --muted:#8B99B3;
+    --crit:#E63946;
+    --crit-dim:#3A1620;
+    --warn:#F4A100;
+    --warn-dim:#3A2C08;
+    --ok:#2DD4BF;
+    --ok-dim:#0E2E2A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  #status-bar{
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; color:var(--muted);
+    padding:6px 20px; border-bottom:1px solid var(--line);
+    background:var(--panel);
+  }
+  #status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none;transition:background .2s;}
+  #status-dot.live{background:var(--ok);box-shadow:0 0 6px var(--ok);}
+  #status-dot.demo{background:var(--warn);}
+  #save-toast{margin-left:auto;font-weight:600;transition:opacity .3s;opacity:0;}
+  #save-toast.show{opacity:1;}
+  #save-toast.ok{color:var(--ok);}
+  #save-toast.err{color:var(--crit);}
+
+  .wrap{max-width:760px;margin:0 auto;padding:22px 20px 60px;}
+
+  header{margin-bottom:18px;}
+  .badge-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .sev{
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;
+    letter-spacing:.08em;color:#fff;background:var(--crit);
+    padding:5px 10px;border-radius:4px;
+  }
+  .cve{
+    font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);
+    background:var(--panel-2);border:1px solid var(--line);padding:5px 9px;border-radius:4px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;font-weight:700;
+    font-size:24px;line-height:1.15;margin:0 0 8px;letter-spacing:-.01em;
+  }
+  h1 span{color:var(--crit);}
+  .lede{color:var(--muted);font-size:14px;line-height:1.55;margin:0;}
+  .lede a{color:var(--text);}
+
+  .instances{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .instances-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);}
+  .instances-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;}
+  .instances-count{font-size:11px;color:var(--muted);}
+  #add-btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;color:var(--ink);
+    background:var(--ok);border:none;border-radius:6px;padding:7px 12px;cursor:pointer;
+  }
+  #add-btn:hover{filter:brightness(1.08);}
+
+  #search-row{padding:10px 16px;border-bottom:1px solid var(--line);}
+  #search-input{
+    width:100%;background:var(--panel-2);color:var(--text);border:1px solid var(--line);
+    border-radius:7px;padding:8px 10px;font-family:'Inter',sans-serif;font-size:13px;
+  }
+  #search-input:focus{outline:none;border-color:var(--ok);}
+  .no-match{padding:16px;text-align:center;color:var(--muted);font-size:12.5px;}
+
+  #add-form{display:none;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel-2);flex-wrap:wrap;}
+  #add-form.open{display:flex;}
+  #add-form input{
+    flex:1;min-width:140px;background:var(--ink);color:var(--text);border:1px solid var(--line);
+    border-radius:6px;padding:8px 10px;font-family:'Inter',sans-serif;font-size:13px;
+  }
+  #add-form input:focus{outline:none;border-color:var(--ok);}
+  #add-form button{font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;border-radius:6px;padding:8px 14px;cursor:pointer;border:none;flex:none;}
+  #add-confirm{background:var(--ok);color:var(--ink);}
+  #add-cancel{background:transparent;color:var(--muted);border:1px solid var(--line) !important;}
+
+  .instance-list{list-style:none;margin:0;padding:0;max-height:260px;overflow-y:auto;}
+  .instance-item{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .instance-item:last-child{border-bottom:none;}
+  .instance-item:hover{background:var(--panel-2);}
+  .instance-item.selected{background:var(--panel-2);box-shadow:inset 3px 0 0 var(--ok);}
+  .instance-name{font-size:13.5px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .instance-name .url{display:block;font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;font-weight:400;}
+  .instance-pct{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);flex:none;}
+  .instance-ring{width:9px;height:9px;border-radius:50%;flex:none;background:var(--line);}
+  .instance-ring.some{background:var(--warn);}
+  .instance-ring.done{background:var(--ok);}
+  .instance-ring.na{background:#5B8DEF;}
+  .empty-state{padding:22px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  #add-status{
+    display:none;padding:10px 16px;font-size:12.5px;border-bottom:1px solid var(--line);
+  }
+  #add-status.error{display:block;background:var(--crit-dim);color:#ff9aa4;}
+  #add-status.info{display:block;background:var(--panel-2);color:var(--muted);}
+
+  .path{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
+  .path-title{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+  .path-row{display:flex;align-items:center;gap:0;overflow-x:auto;}
+  .node{flex:none;font-family:'JetBrains Mono',monospace;font-size:11.5px;padding:8px 12px;border-radius:6px;white-space:nowrap;}
+  .node.anon{background:var(--panel-2);border:1px solid var(--line);color:var(--text);}
+  .node.route{background:var(--crit-dim);border:1px solid var(--crit);color:#ff9aa4;}
+  .node.rce{background:var(--crit);color:#fff;font-weight:600;}
+  .arrow{flex:none;color:var(--muted);padding:0 8px;font-size:13px;}
+  .gate{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;margin:0 4px;}
+  .gate-label{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .gate-pill{font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:4px 9px;border-radius:20px;border:1px dashed var(--line);color:var(--muted);}
+  .gate-pill.blocked{border-color:var(--ok);color:var(--ok);border-style:solid;}
+
+  #detail{margin-top:18px;}
+  #detail.hidden{display:none;}
+  .detail-head{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px;}
+  .detail-head label{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .detail-head input{
+    background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:7px;
+    padding:8px 10px;font-family:'Inter',sans-serif;font-size:13.5px;width:100%;
+  }
+  .detail-head input:focus{outline:none;border-color:var(--ok);}
+  .detail-head select{
+    width:100%;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:7px;
+    padding:8px 10px;font-family:'Inter',sans-serif;font-size:13.5px;
+  }
+  .detail-head select:focus{outline:none;border-color:var(--ok);}
+  .detail-row{display:flex;gap:10px;}
+  .detail-row > div{flex:1;}
+
+  .na-banner{
+    margin-top:14px;background:var(--ok-dim);border:1px solid var(--ok);color:var(--ok);
+    border-radius:10px;padding:14px 18px;font-size:13.5px;line-height:1.5;
+  }
+  .na-banner.hidden{display:none;}
+  #remediation-blocks.hidden{display:none;}
+
+  .section{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-top:14px;overflow:hidden;}
+  .sec-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);}
+  .sec-num{
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;width:24px;height:24px;
+    border-radius:6px;display:flex;align-items:center;justify-content:center;
+    background:var(--panel-2);color:var(--muted);flex:none;
+  }
+  .sec-head.crit .sec-num{background:var(--crit-dim);color:#ff9aa4;}
+  .sec-head.warn .sec-num{background:var(--warn-dim);color:var(--warn);}
+  .sec-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14.5px;}
+  .sec-body{padding:14px 18px 16px;}
+  .sec-body p{margin:0 0 10px;font-size:13.5px;color:var(--muted);line-height:1.55;}
+
+  table.versions{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+  table.versions td{padding:6px 0;border-bottom:1px solid var(--line);}
+  table.versions td:first-child{color:var(--muted);width:46%;}
+  table.versions td.mono{color:var(--text);}
+
+  .checklist{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .check-item{
+    display:flex;align-items:flex-start;gap:10px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .15s;
+  }
+  .check-item:hover{border-color:#3a4c72;}
+  .check-item.done{border-color:var(--ok);background:var(--ok-dim);}
+  .check-item input{
+    appearance:none;-webkit-appearance:none;width:17px;height:17px;flex:none;margin-top:1px;
+    border:1.5px solid var(--line);border-radius:4px;background:var(--panel);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .check-item input:checked{background:var(--ok);border-color:var(--ok);}
+  .check-item input:checked::after{content:"✓";font-size:12px;color:#062421;font-weight:700;}
+  .check-item .ct{font-size:13px;line-height:1.4;}
+  .check-item .ct b{display:block;font-weight:600;color:var(--text);}
+  .check-item .ct span{color:var(--muted);}
+
+  code.inline{
+    font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--panel-2);
+    border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:#ffd9dc;
+  }
+
+  .record{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
+  .record-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin-bottom:10px;}
+  textarea{
+    width:100%;min-height:70px;resize:vertical;background:var(--panel-2);color:var(--text);
+    border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-family:'Inter',sans-serif;
+    font-size:13px;line-height:1.5;
+  }
+  textarea:focus{outline:none;border-color:var(--ok);}
+  .save-hint{font-size:11px;color:var(--muted);margin-top:6px;}
+
+  .progress-wrap{margin-top:14px;}
+  .progress-track{height:6px;background:var(--panel-2);border-radius:99px;overflow:hidden;border:1px solid var(--line);}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--warn),var(--ok));transition:width .3s;}
+  .progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px;}
+
+  ::-webkit-scrollbar{height:6px;width:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+
+  @media (max-width:480px){
+    h1{font-size:20px;}
+    .wrap{padding:16px 14px 40px;}
+    .detail-row{flex-direction:column;}
+  }
+</style>
+</head>
+<body>
+
+<div id="status-bar">
+  <span id="status-dot"></span>
+  <span id="status-text">Connexion au document Grist…</span>
+  <span id="save-toast"></span>
+</div>
+
+<div class="wrap">
+
+  <header>
+    <div class="badge-row">
+      <span class="sev">CRITIQUE</span>
+      <span class="cve">CVE-2026-63030</span>
+      <span class="cve">CVE-2026-60137</span>
+    </div>
+    <h1>wp2shell — RCE <span>pré-authentification</span> dans le cœur WordPress</h1>
+    <p class="lede">
+      Exécution de code à distance par un attaquant anonyme via l'API REST, y compris sur une
+      installation par défaut sans plugin.
+      <a href="https://www.rapid7.com/blog/post/etr-cve-2026-63030-wp2shell-a-critical-remote-code-execution-vulnerability-in-wordpress-core/" target="_blank" rel="noopener">Rapid7</a>
+      · <a href="https://www.aikido.dev/blog/unauthenticated-rce-in-wordpress-wp2shell" target="_blank" rel="noopener">Aikido</a>
+    </p>
+  </header>
+
+  <div class="instances">
+    <div class="instances-head">
+      <div>
+        <div class="instances-title">Instances suivies</div>
+        <div class="instances-count" id="instances-count">0 instance</div>
+      </div>
+      <button id="add-btn" type="button">+ Ajouter une instance</button>
+    </div>
+    <div id="search-row">
+      <input id="search-input" type="text" placeholder="🔍 Rechercher par site ou par agent…">
+    </div>
+    <div id="add-form">
+      <input id="new-site" type="text" placeholder="Nom du site (ex. Intranet Rectorat)">
+      <input id="new-url" type="text" placeholder="URL (ex. intranet.ac-xxx.fr)">
+      <input id="new-agent" type="text" placeholder="Votre nom (agent en charge)">
+      <button id="add-confirm" type="button">Créer</button>
+      <button id="add-cancel" type="button">Annuler</button>
+    </div>
+    <div id="add-status"></div>
+    <ul class="instance-list" id="instance-list"></ul>
+    <div class="empty-state" id="empty-state">Aucune instance pour l'instant — ajoutez-en une pour commencer le suivi.</div>
+  </div>
+
+  <div class="path">
+    <div class="path-title">Chemin d'exploitation</div>
+    <div class="path-row">
+      <div class="node anon">Attaquant anonyme</div>
+      <div class="arrow">→</div>
+      <div class="node route mono">/wp-json/batch/v1</div>
+      <div class="arrow">→</div>
+      <div class="node rce">Exécution de code</div>
+      <div class="gate">
+        <div class="gate-label">Blocage reverse proxy</div>
+        <div class="gate-pill" id="gate-pill">à activer</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="detail" class="hidden">
+
+    <div class="detail-head">
+      <div class="detail-row">
+        <div>
+          <label for="site-field">Site / instance</label>
+          <input id="site-field" type="text">
+        </div>
+        <div>
+          <label for="url-field">URL</label>
+          <input id="url-field" type="text">
+        </div>
+      </div>
+      <div class="detail-row">
+        <div>
+          <label for="version-field">Version actuelle</label>
+          <input id="version-field" type="text" placeholder="ex. 6.9.3">
+        </div>
+        <div>
+          <label for="agent-field">Agent en charge</label>
+          <input id="agent-field" type="text">
+        </div>
+      </div>
+      <div>
+        <label for="status-field">Statut de vulnérabilité</label>
+        <select id="status-field">
+          <option value="">À évaluer</option>
+          <option value="Vulnérable">Vulnérable — plan de remédiation à suivre</option>
+          <option value="Non vulnérable">Non vulnérable — version saine, rien à faire</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="na-banner" class="na-banner hidden">
+      ✓ Instance déclarée non vulnérable (version &lt; 6.9.0, ou déjà en 6.9.5+ / 7.0.2+ / 6.8.6+). Aucune action de remédiation requise — vérifie simplement que la version indiquée ci-dessus est à jour.
+    </div>
+
+    <div class="section">
+      <div class="sec-head"><div class="sec-num">1</div><div class="sec-title">Versions concernées</div></div>
+      <div class="sec-body">
+        <table class="versions">
+          <tr><td>Affectées</td><td class="mono">6.9.0 – 6.9.4 &nbsp;·&nbsp; 7.0.0 – 7.0.1</td></tr>
+          <tr><td>Non affectées par cette RCE</td><td class="mono">&lt; 6.9.0</td></tr>
+          <tr><td>Branche 6.8.x</td><td class="mono">non vulnérable à wp2shell, mais injection SQL corrigée en 6.8.6</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div id="remediation-blocks">
+    <div class="section">
+      <div class="sec-head crit"><div class="sec-num">2</div><div class="sec-title">Action prioritaire — à faire maintenant</div></div>
+      <div class="sec-body">
+        <ul class="checklist">
+          <li class="check-item" data-field="VersionVerifiee">
+            <input type="checkbox">
+            <div class="ct"><b>Vérifier la version</b><span>Connexion à l'instance (dashboard ou <code class="inline">wp-cli</code>) et relevé de la version installée.</span></div>
+          </li>
+          <li class="check-item" data-field="MiseAJourAppliquee">
+            <input type="checkbox">
+            <div class="ct"><b>Mettre à jour immédiatement</b><span>6.9.5 pour la branche 6.9 · 7.0.2 pour la branche 7.0 · 6.8.6 pour les sites en 6.8.x.</span></div>
+          </li>
+          <li class="check-item" data-field="MajForceeVerifiee">
+            <input type="checkbox">
+            <div class="ct"><b>Contrôler l'application effective</b><span>Vérifier que la mise à jour forcée a bien été appliquée, même si les mises à jour automatiques sont activées.</span></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-head warn"><div class="sec-num">3</div><div class="sec-title">Mesures temporaires si la mise à jour est impossible</div></div>
+      <div class="sec-body">
+        <p>Pas de WAF disponible : ces mesures s'appliquent au niveau du reverse proxy, sur l'instance si elle est exposée à Internet, jusqu'au patch.</p>
+        <ul class="checklist">
+          <li class="check-item" data-field="WAFBlocagePath">
+            <input type="checkbox">
+            <div class="ct"><b>Bloquer <code class="inline">/wp-json/batch/v1</code></b><span>Au niveau du reverse proxy.</span></div>
+          </li>
+          <li class="check-item" data-field="WAFBlocageQuery">
+            <input type="checkbox">
+            <div class="ct"><b>Bloquer <code class="inline">?rest_route=/batch/v1</code></b><span>Au niveau du reverse proxy — les deux formes de la requête doivent être filtrées.</span></div>
+          </li>
+          <li class="check-item" data-field="RestApiRestreinte">
+            <input type="checkbox">
+            <div class="ct"><b>Restreindre l'API REST anonyme</b><span>Si possible fonctionnellement, via plugin ou configuration dédiée.</span></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-head"><div class="sec-num">4</div><div class="sec-title">Vérifications a posteriori</div></div>
+      <div class="sec-body">
+        <ul class="checklist">
+          <li class="check-item" data-field="LogsControles">
+            <input type="checkbox">
+            <div class="ct"><b>Contrôler les journaux HTTP</b><span>Rechercher les accès à <code class="inline">/wp-json/batch/v1</code> ou <code class="inline">?rest_route=/batch/v1</code>, avant et après la mise à jour.</span></div>
+          </li>
+          <li class="check-item" data-field="FichiersControles">
+            <input type="checkbox">
+            <div class="ct"><b>Contrôler les fichiers et comptes</b><span>Présence de fichiers PHP récents/suspects, création récente de comptes administrateurs.</span></div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-label"><span id="progress-count">0 / 7 étapes traitées</span><span id="progress-pct">0 %</span></div>
+    </div>
+    </div>
+
+    <div class="record">
+      <div class="record-title">Notes de l'agent</div>
+      <textarea id="notes" placeholder="Constat, mesures appliquées, points d'attention…"></textarea>
+      <div class="save-hint" id="save-hint">—</div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  const FIELD_KEYS = ['VersionVerifiee','MiseAJourAppliquee','MajForceeVerifiee','WAFBlocagePath','WAFBlocageQuery','RestApiRestreinte','LogsControles','FichiersControles'];
+  const checkItems = Array.from(document.querySelectorAll('.check-item'));
+
+  const statusDot = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+  const instanceListEl = document.getElementById('instance-list');
+  const instancesCountEl = document.getElementById('instances-count');
+  const emptyStateEl = document.getElementById('empty-state');
+  const detailEl = document.getElementById('detail');
+  const addBtn = document.getElementById('add-btn');
+  const addForm = document.getElementById('add-form');
+  const newSiteInput = document.getElementById('new-site');
+  const newUrlInput = document.getElementById('new-url');
+  const newAgentInput = document.getElementById('new-agent');
+  const addConfirm = document.getElementById('add-confirm');
+  const addCancel = document.getElementById('add-cancel');
+  const addStatus = document.getElementById('add-status');
+  const searchInput = document.getElementById('search-input');
+  const gatePill = document.getElementById('gate-pill');
+  const notesEl = document.getElementById('notes');
+  const saveHint = document.getElementById('save-hint');
+
+  const siteField = document.getElementById('site-field');
+  const urlField = document.getElementById('url-field');
+  const versionField = document.getElementById('version-field');
+  const agentField = document.getElementById('agent-field');
+  const statusField = document.getElementById('status-field');
+  const naBanner = document.getElementById('na-banner');
+  const remediationBlocks = document.getElementById('remediation-blocks');
+
+  let gristConnected = false;
+  let records = [];
+  let selectedId = null;
+  let saveTimer = null;
+  let demoAutoId = 1;
+
+  function pctForRecord(r){
+    if (r.Statut === 'Non vulnérable') return 100;
+    const done = FIELD_KEYS.filter(k => !!r[k]).length;
+    return Math.round((done / FIELD_KEYS.length) * 100);
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderList(){
+    instanceListEl.innerHTML = '';
+    instancesCountEl.textContent = records.length + (records.length > 1 ? ' instances' : ' instance');
+
+    const q = searchInput.value.trim().toLowerCase();
+    const visible = q
+      ? records.filter(r => (r.Site || '').toLowerCase().includes(q) || (r.Agent || '').toLowerCase().includes(q) || (r.URL || '').toLowerCase().includes(q))
+      : records;
+
+    emptyStateEl.style.display = records.length ? 'none' : 'block';
+    instanceListEl.style.display = records.length ? 'block' : 'none';
+
+    if (records.length && q && !visible.length) {
+      const li = document.createElement('li');
+      li.className = 'no-match';
+      li.textContent = 'Aucune instance ne correspond à « ' + searchInput.value.trim() + ' ».';
+      instanceListEl.appendChild(li);
+      return;
+    }
+
+    visible.forEach(r => {
+      const pct = pctForRecord(r);
+      const li = document.createElement('li');
+      li.className = 'instance-item' + (r.id === selectedId ? ' selected' : '');
+      const ringClass = r.Statut === 'Non vulnérable' ? 'na' : (pct === 100 ? 'done' : (pct > 0 ? 'some' : ''));
+      const pctLabel = r.Statut === 'Non vulnérable' ? 'N/A' : (pct + ' %');
+      li.innerHTML =
+        '<span class="instance-ring ' + ringClass + '"></span>' +
+        '<span class="instance-name">' + escapeHtml(r.Site || '(sans nom)') +
+          (r.URL ? '<span class="url">' + escapeHtml(r.URL) + (r.Agent ? ' · ' + escapeHtml(r.Agent) : '') + '</span>' : (r.Agent ? '<span class="url">' + escapeHtml(r.Agent) + '</span>' : '')) +
+        '</span>' +
+        '<span class="instance-pct">' + pctLabel + '</span>';
+      li.addEventListener('click', () => selectInstance(r.id));
+      instanceListEl.appendChild(li);
+    });
+  }
+
+  function selectInstance(id){
+    selectedId = id;
+    const r = records.find(x => x.id === id);
+    if (!r) { detailEl.classList.add('hidden'); return; }
+    detailEl.classList.remove('hidden');
+
+    siteField.value = r.Site || '';
+    urlField.value = r.URL || '';
+    versionField.value = r.VersionActuelle || '';
+    agentField.value = r.Agent || '';
+    notesEl.value = r.Notes || '';
+    statusField.value = r.Statut || '';
+    applyStatusView(r.Statut || '');
+
+    checkItems.forEach(item => {
+      const checked = !!r[item.dataset.field];
+      item.classList.toggle('done', checked);
+      item.querySelector('input').checked = checked;
+    });
+
+    saveHint.textContent = gristConnected ? 'Enregistré dans Grist.' : 'Mode démo — non enregistré.';
+    updateProgress();
+    renderList();
+  }
+
+  function applyStatusView(status){
+    const isNa = status === 'Non vulnérable';
+    naBanner.classList.toggle('hidden', !isNa);
+    remediationBlocks.classList.toggle('hidden', isNa);
+  }
+
+  statusField.addEventListener('change', (e) => {
+    applyStatusView(e.target.value);
+    saveField('Statut', e.target.value);
+  });
+
+  function updateProgress(){
+    const done = checkItems.filter(i => i.classList.contains('done')).length;
+    const pct = Math.round((done / checkItems.length) * 100);
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-count').textContent = done + ' / ' + checkItems.length + ' étapes traitées';
+    document.getElementById('progress-pct').textContent = pct + ' %';
+
+    const wafDone = document.querySelector('[data-field="WAFBlocagePath"]').classList.contains('done')
+      && document.querySelector('[data-field="WAFBlocageQuery"]').classList.contains('done');
+    const maj = document.querySelector('[data-field="MiseAJourAppliquee"]').classList.contains('done');
+    gatePill.textContent = maj ? 'MAJ appliquée' : (wafDone ? 'bloqué' : 'à activer');
+    gatePill.classList.toggle('blocked', maj || wafDone);
+  }
+
+  function patchLocalRecord(id, fields){
+    const r = records.find(x => x.id === id);
+    if (r) Object.assign(r, fields);
+  }
+
+  const saveToast = document.getElementById('save-toast');
+  let toastTimer = null;
+  function flashToast(ok, msg){
+    clearTimeout(toastTimer);
+    saveToast.textContent = (ok ? '✓ ' : '✕ ') + msg;
+    saveToast.className = (ok ? 'ok' : 'err') + ' show';
+    toastTimer = setTimeout(() => { saveToast.className = saveToast.className.replace(' show', ''); }, ok ? 2500 : 6000);
+  }
+
+  function saveField(field, value){
+    if (selectedId == null) return;
+    patchLocalRecord(selectedId, { [field]: value });
+    renderList();
+    if (!gristConnected) { saveHint.textContent = 'Mode démo — non enregistré.'; flashToast(false, 'Mode démo — non enregistré.'); return; }
+    grist.selectedTable.update({ id: selectedId, fields: { [field]: value } })
+      .then(() => { saveHint.textContent = 'Enregistré dans Grist.'; flashToast(true, 'Enregistré dans Grist.'); })
+      .catch(err => {
+        saveHint.textContent = "Échec de l'enregistrement.";
+        flashToast(false, "Échec — vérifie que ton accès est en Éditeur, pas Lecteur.");
+        console.error(err);
+      });
+  }
+
+  checkItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      if (e.target.tagName !== 'INPUT') item.querySelector('input').checked = !item.querySelector('input').checked;
+      const checked = item.querySelector('input').checked;
+      item.classList.toggle('done', checked);
+      updateProgress();
+      saveField(item.dataset.field, checked);
+    });
+  });
+
+  [['site-field','Site'], ['url-field','URL'], ['version-field','VersionActuelle'], ['agent-field','Agent']].forEach(([elId, field]) => {
+    document.getElementById(elId).addEventListener('change', (e) => saveField(field, e.target.value));
+  });
+
+  notesEl.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    saveHint.textContent = 'Frappe en cours…';
+    saveTimer = setTimeout(() => saveField('Notes', notesEl.value), 600);
+  });
+
+  addBtn.addEventListener('click', () => {
+    addForm.classList.add('open');
+    addStatus.className = ''; addStatus.textContent = '';
+    newSiteInput.focus();
+  });
+  searchInput.addEventListener('input', renderList);
+  addCancel.addEventListener('click', () => {
+    addForm.classList.remove('open');
+    addStatus.className = ''; addStatus.textContent = '';
+    newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
+  });
+
+  function createInstance(){
+    const site = newSiteInput.value.trim();
+    const url = newUrlInput.value.trim();
+    const agent = newAgentInput.value.trim();
+    if (!site) { newSiteInput.focus(); return; }
+    const fields = { Site: site, URL: url, Agent: agent };
+    addStatus.className = 'info';
+    addStatus.textContent = 'Création en cours…';
+
+    if (gristConnected) {
+      grist.selectedTable.create({ fields })
+        .then(res => {
+          const newId = Array.isArray(res) ? res[0].id : res.id;
+          records.push(Object.assign({ id: newId }, fields));
+          addForm.classList.remove('open');
+          newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
+          addStatus.className = ''; addStatus.textContent = '';
+          flashToast(true, 'Instance créée dans Grist.');
+          selectInstance(newId);
+        })
+        .catch(err => {
+          addStatus.className = 'error';
+          addStatus.textContent = "Échec de la création — l'accès est probablement en lecture seule. Demande à ce que le rôle d'accès public (ou ton compte) soit réglé sur « Éditeur » dans les paramètres de partage du document.";
+          flashToast(false, "Échec — vérifie que ton accès est en Éditeur, pas Lecteur.");
+          console.error(err);
+        });
+    } else {
+      const id = 'demo-' + (demoAutoId++);
+      records.push(Object.assign({ id }, fields));
+      addForm.classList.remove('open');
+      newSiteInput.value = ''; newUrlInput.value = ''; newAgentInput.value = '';
+      addStatus.className = ''; addStatus.textContent = '';
+      selectInstance(id);
+    }
+  }
+  addConfirm.addEventListener('click', createInstance);
+  newUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
+  newSiteInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
+  newAgentInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
+
+  if (window.grist) {
+    grist.ready({
+      columns: [
+        { name: 'Site', title: 'Site / instance' },
+        { name: 'URL', title: 'URL', optional: true },
+        { name: 'VersionActuelle', title: 'Version actuelle', optional: true },
+        { name: 'VersionVerifiee', title: 'Version vérifiée', type: 'Bool' },
+        { name: 'MiseAJourAppliquee', title: 'Mise à jour appliquée', type: 'Bool' },
+        { name: 'MajForceeVerifiee', title: 'MAJ forcée vérifiée', type: 'Bool' },
+        { name: 'WAFBlocagePath', title: 'WAF — chemin bloqué', type: 'Bool' },
+        { name: 'WAFBlocageQuery', title: 'WAF — query bloquée', type: 'Bool' },
+        { name: 'RestApiRestreinte', title: 'API REST restreinte', type: 'Bool' },
+        { name: 'LogsControles', title: 'Logs contrôlés', type: 'Bool' },
+        { name: 'FichiersControles', title: 'Fichiers/comptes contrôlés', type: 'Bool' },
+        { name: 'Notes', title: 'Notes', type: 'Text', optional: true },
+        { name: 'Agent', title: 'Agent en charge', optional: true },
+        { name: 'Statut', title: 'Statut vulnérabilité', optional: true },
+      ],
+      requiredAccess: 'full'
+    });
+
+    grist.onRecords(function (recs, mappings) {
+      gristConnected = true;
+      statusDot.className = 'live';
+      statusText.textContent = 'Connecté au document Grist — création et modifications enregistrées automatiquement.';
+
+      records = recs.map(r => Object.assign({ id: r.id }, r, grist.mapColumnNames(r, mappings) || {}));
+      if (!records.find(r => r.id === selectedId)) {
+        selectedId = records.length ? records[0].id : null;
+      }
+      renderList();
+      if (selectedId != null) selectInstance(selectedId); else detailEl.classList.add('hidden');
+    });
+  } else {
+    statusDot.className = 'demo';
+    statusText.textContent = 'Mode démo (hors Grist) — aperçu uniquement, rien n\'est enregistré.';
+    renderList();
+  }
+</script>
+
+</body>
+</html>
