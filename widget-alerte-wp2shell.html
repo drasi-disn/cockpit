@@ -231,10 +231,10 @@
   <header>
     <div class="badge-row">
       <span class="sev">CRITIQUE</span>
-      <span class="cve">CVE‑2026‑63030</span>
-      <span class="cve">CVE‑2026‑60137</span>
+      <span class="cve">CVE-2026-63030</span>
+      <span class="cve">CVE-2026-60137</span>
     </div>
-    <h1>wp2shell — RCE <span>pré‑authentification</span> dans le cœur WordPress</h1>
+    <h1>wp2shell — RCE <span>pré-authentification</span> dans le cœur WordPress</h1>
     <p class="lede">
       Exécution de code à distance par un attaquant anonyme via l'API REST, y compris sur une
       installation par défaut sans plugin.
@@ -322,7 +322,7 @@
       <div class="sec-head"><div class="sec-num">1</div><div class="sec-title">Versions concernées</div></div>
       <div class="sec-body">
         <table class="versions">
-          <tr><td>Affectées</td><td class="mono">6.9.0 → 6.9.4 &nbsp;·&nbsp; 7.0.0 → 7.0.1</td></tr>
+          <tr><td>Affectées</td><td class="mono">6.9.0 – 6.9.4 &nbsp;·&nbsp; 7.0.0 – 7.0.1</td></tr>
           <tr><td>Non affectées par cette RCE</td><td class="mono">&lt; 6.9.0</td></tr>
           <tr><td>Branche 6.8.x</td><td class="mono">non vulnérable à wp2shell, mais injection SQL corrigée en 6.8.6</td></tr>
         </table>
@@ -546,7 +546,7 @@
   let toastTimer = null;
   function flashToast(ok, msg){
     clearTimeout(toastTimer);
-    saveToast.textContent = (ok ? '✓ ' : '✗ ') + msg;
+    saveToast.textContent = (ok ? '✓ ' : '✕ ') + msg;
     saveToast.className = (ok ? 'ok' : 'err') + ' show';
     toastTimer = setTimeout(() => { saveToast.className = saveToast.className.replace(' show', ''); }, ok ? 2500 : 6000);
   }
