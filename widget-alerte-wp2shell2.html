@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Alerte wp2shell — Suivi de remédiation</title>
+<title>Cockpit vulnérabilités — Suivi de remédiation</title>
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -48,6 +48,19 @@
 
   .wrap{max-width:760px;margin:0 auto;padding:22px 20px 60px;}
 
+  .vuln-switcher{
+    display:flex;align-items:center;gap:10px;margin-bottom:16px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;
+  }
+  .vuln-switcher label{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);flex:none;}
+  .vuln-switcher select{
+    flex:1;background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:7px;
+    padding:8px 10px;font-family:'Inter',sans-serif;font-size:13.5px;
+  }
+  .vuln-switcher select:focus{outline:none;border-color:var(--ok);}
+  .vuln-switcher .manage-link{font-size:11.5px;color:var(--muted);text-decoration:none;flex:none;}
+  .vuln-switcher .manage-link:hover{color:var(--ok);}
+
   header{margin-bottom:18px;}
   .badge-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
   .sev{
@@ -55,6 +68,9 @@
     letter-spacing:.08em;color:#fff;background:var(--crit);
     padding:5px 10px;border-radius:4px;
   }
+  .sev.severite-haute{background:var(--warn);color:#000;}
+  .sev.severite-moyenne{background:#FFD166;color:#000;}
+  .sev.severite-basse{background:var(--muted);color:#000;}
   .cve{
     font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);
     background:var(--panel-2);border:1px solid var(--line);padding:5px 9px;border-radius:4px;
@@ -63,9 +79,9 @@
     font-family:'Space Grotesk',sans-serif;font-weight:700;
     font-size:24px;line-height:1.15;margin:0 0 8px;letter-spacing:-.01em;
   }
-  h1 span{color:var(--crit);}
   .lede{color:var(--muted);font-size:14px;line-height:1.55;margin:0;}
   .lede a{color:var(--text);}
+  .empty-vuln{padding:22px 16px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:10px;}
 
   .instances{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
   .instances-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);}
@@ -76,6 +92,7 @@
     background:var(--ok);border:none;border-radius:6px;padding:7px 12px;cursor:pointer;
   }
   #add-btn:hover{filter:brightness(1.08);}
+  #add-btn:disabled{opacity:.4;cursor:not-allowed;}
 
   #search-row{padding:10px 16px;border-bottom:1px solid var(--line);}
   #search-input{
@@ -123,10 +140,6 @@
   .node.route{background:var(--crit-dim);border:1px solid var(--crit);color:#ff9aa4;}
   .node.rce{background:var(--crit);color:#fff;font-weight:600;}
   .arrow{flex:none;color:var(--muted);padding:0 8px;font-size:13px;}
-  .gate{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;margin:0 4px;}
-  .gate-label{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
-  .gate-pill{font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:4px 9px;border-radius:20px;border:1px dashed var(--line);color:var(--muted);}
-  .gate-pill.blocked{border-color:var(--ok);color:var(--ok);border-style:solid;}
 
   #detail{margin-top:18px;}
   #detail.hidden{display:none;}
@@ -159,11 +172,10 @@
     border-radius:6px;display:flex;align-items:center;justify-content:center;
     background:var(--panel-2);color:var(--muted);flex:none;
   }
-  .sec-head.crit .sec-num{background:var(--crit-dim);color:#ff9aa4;}
-  .sec-head.warn .sec-num{background:var(--warn-dim);color:var(--warn);}
+  .sec-head.prioritaire .sec-num{background:var(--crit-dim);color:#ff9aa4;}
+  .sec-head.temporaire .sec-num{background:var(--warn-dim);color:var(--warn);}
   .sec-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14.5px;}
   .sec-body{padding:14px 18px 16px;}
-  .sec-body p{margin:0 0 10px;font-size:13.5px;color:var(--muted);line-height:1.55;}
 
   table.versions{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
   table.versions td{padding:6px 0;border-bottom:1px solid var(--line);}
@@ -187,11 +199,6 @@
   .check-item .ct{font-size:13px;line-height:1.4;}
   .check-item .ct b{display:block;font-weight:600;color:var(--text);}
   .check-item .ct span{color:var(--muted);}
-
-  code.inline{
-    font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--panel-2);
-    border:1px solid var(--line);padding:1px 6px;border-radius:4px;color:#ffd9dc;
-  }
 
   .record{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
   .record-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin-bottom:10px;}
@@ -228,187 +235,128 @@
 
 <div class="wrap">
 
-  <header>
-    <div class="badge-row">
-      <span class="sev">CRITIQUE</span>
-      <span class="cve">CVE-2026-63030</span>
-      <span class="cve">CVE-2026-60137</span>
-    </div>
-    <h1>wp2shell — RCE <span>pré-authentification</span> dans le cœur WordPress</h1>
-    <p class="lede">
-      Exécution de code à distance par un attaquant anonyme via l'API REST, y compris sur une
-      installation par défaut sans plugin.
-      <a href="https://www.rapid7.com/blog/post/etr-cve-2026-63030-wp2shell-a-critical-remote-code-execution-vulnerability-in-wordpress-core/" target="_blank" rel="noopener">Rapid7</a>
-      · <a href="https://www.aikido.dev/blog/unauthenticated-rce-in-wordpress-wp2shell" target="_blank" rel="noopener">Aikido</a>
-    </p>
-  </header>
-
-  <div class="instances">
-    <div class="instances-head">
-      <div>
-        <div class="instances-title">Instances suivies</div>
-        <div class="instances-count" id="instances-count">0 instance</div>
-      </div>
-      <button id="add-btn" type="button">+ Ajouter une instance</button>
-    </div>
-    <div id="search-row">
-      <input id="search-input" type="text" placeholder="🔍 Rechercher par site ou par agent…">
-    </div>
-    <div id="add-form">
-      <input id="new-site" type="text" placeholder="Nom du site (ex. Intranet Rectorat)">
-      <input id="new-url" type="text" placeholder="URL (ex. intranet.ac-xxx.fr)">
-      <input id="new-agent" type="text" placeholder="Votre nom (agent en charge)">
-      <button id="add-confirm" type="button">Créer</button>
-      <button id="add-cancel" type="button">Annuler</button>
-    </div>
-    <div id="add-status"></div>
-    <ul class="instance-list" id="instance-list"></ul>
-    <div class="empty-state" id="empty-state">Aucune instance pour l'instant — ajoutez-en une pour commencer le suivi.</div>
+  <div class="vuln-switcher">
+    <label for="vuln-select">Vulnérabilité</label>
+    <select id="vuln-select"></select>
   </div>
 
-  <div class="path">
-    <div class="path-title">Chemin d'exploitation</div>
-    <div class="path-row">
-      <div class="node anon">Attaquant anonyme</div>
-      <div class="arrow">→</div>
-      <div class="node route mono">/wp-json/batch/v1</div>
-      <div class="arrow">→</div>
-      <div class="node rce">Exécution de code</div>
-      <div class="gate">
-        <div class="gate-label">Blocage reverse proxy</div>
-        <div class="gate-pill" id="gate-pill">à activer</div>
+  <div id="vuln-content">
+    <header>
+      <div class="badge-row" id="badge-row"></div>
+      <h1 id="vuln-title"></h1>
+      <p class="lede" id="vuln-lede"></p>
+    </header>
+
+    <div class="instances">
+      <div class="instances-head">
+        <div>
+          <div class="instances-title">Instances suivies</div>
+          <div class="instances-count" id="instances-count">0 instance</div>
+        </div>
+        <button id="add-btn" type="button">+ Ajouter une instance</button>
       </div>
+      <div id="search-row">
+        <input id="search-input" type="text" placeholder="🔍 Rechercher par site ou par agent…">
+      </div>
+      <div id="add-form">
+        <input id="new-site" type="text" placeholder="Nom du site (ex. Intranet Rectorat)">
+        <input id="new-url" type="text" placeholder="URL (ex. intranet.ac-xxx.fr)">
+        <input id="new-agent" type="text" placeholder="Votre nom (agent en charge)">
+        <button id="add-confirm" type="button">Créer</button>
+        <button id="add-cancel" type="button">Annuler</button>
+      </div>
+      <div id="add-status"></div>
+      <ul class="instance-list" id="instance-list"></ul>
+      <div class="empty-state" id="empty-state">Aucune instance pour l'instant — ajoutez-en une pour commencer le suivi.</div>
+    </div>
+
+    <div class="path" id="path-block">
+      <div class="path-title">Chemin d'exploitation</div>
+      <div class="path-row" id="path-row"></div>
+    </div>
+
+    <div id="detail" class="hidden">
+
+      <div class="detail-head">
+        <div class="detail-row">
+          <div>
+            <label for="site-field">Site / instance</label>
+            <input id="site-field" type="text">
+          </div>
+          <div>
+            <label for="url-field">URL</label>
+            <input id="url-field" type="text">
+          </div>
+        </div>
+        <div class="detail-row">
+          <div>
+            <label for="version-field">Version actuelle</label>
+            <input id="version-field" type="text" placeholder="ex. 6.9.3">
+          </div>
+          <div>
+            <label for="agent-field">Agent en charge</label>
+            <input id="agent-field" type="text">
+          </div>
+        </div>
+        <div>
+          <label for="status-field">Statut de vulnérabilité</label>
+          <select id="status-field">
+            <option value="">À évaluer</option>
+            <option value="Vulnérable">Vulnérable — plan de remédiation à suivre</option>
+            <option value="Non vulnérable">Non vulnérable — version saine, rien à faire</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="na-banner" class="na-banner hidden">
+        ✓ Instance déclarée non vulnérable. Aucune action de remédiation requise — vérifie simplement que la version indiquée ci-dessus est à jour.
+      </div>
+
+      <div class="section" id="versions-section">
+        <div class="sec-head"><div class="sec-num">i</div><div class="sec-title">Versions concernées</div></div>
+        <div class="sec-body">
+          <table class="versions" id="versions-table"></table>
+        </div>
+      </div>
+
+      <div id="remediation-blocks">
+        <div id="checklist-sections"></div>
+
+        <div class="progress-wrap">
+          <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+          <div class="progress-label"><span id="progress-count">0 / 0 étapes traitées</span><span id="progress-pct">0 %</span></div>
+        </div>
+      </div>
+
+      <div class="record">
+        <div class="record-title">Notes de l'agent</div>
+        <textarea id="notes" placeholder="Constat, mesures appliquées, points d'attention…"></textarea>
+        <div class="save-hint" id="save-hint">—</div>
+      </div>
+
     </div>
   </div>
 
-  <div id="detail" class="hidden">
-
-    <div class="detail-head">
-      <div class="detail-row">
-        <div>
-          <label for="site-field">Site / instance</label>
-          <input id="site-field" type="text">
-        </div>
-        <div>
-          <label for="url-field">URL</label>
-          <input id="url-field" type="text">
-        </div>
-      </div>
-      <div class="detail-row">
-        <div>
-          <label for="version-field">Version actuelle</label>
-          <input id="version-field" type="text" placeholder="ex. 6.9.3">
-        </div>
-        <div>
-          <label for="agent-field">Agent en charge</label>
-          <input id="agent-field" type="text">
-        </div>
-      </div>
-      <div>
-        <label for="status-field">Statut de vulnérabilité</label>
-        <select id="status-field">
-          <option value="">À évaluer</option>
-          <option value="Vulnérable">Vulnérable — plan de remédiation à suivre</option>
-          <option value="Non vulnérable">Non vulnérable — version saine, rien à faire</option>
-        </select>
-      </div>
-    </div>
-
-    <div id="na-banner" class="na-banner hidden">
-      ✓ Instance déclarée non vulnérable (version &lt; 6.9.0, ou déjà en 6.9.5+ / 7.0.2+ / 6.8.6+). Aucune action de remédiation requise — vérifie simplement que la version indiquée ci-dessus est à jour.
-    </div>
-
-    <div class="section">
-      <div class="sec-head"><div class="sec-num">1</div><div class="sec-title">Versions concernées</div></div>
-      <div class="sec-body">
-        <table class="versions">
-          <tr><td>Affectées</td><td class="mono">6.9.0 – 6.9.4 &nbsp;·&nbsp; 7.0.0 – 7.0.1</td></tr>
-          <tr><td>Non affectées par cette RCE</td><td class="mono">&lt; 6.9.0</td></tr>
-          <tr><td>Branche 6.8.x</td><td class="mono">non vulnérable à wp2shell, mais injection SQL corrigée en 6.8.6</td></tr>
-        </table>
-      </div>
-    </div>
-
-    <div id="remediation-blocks">
-    <div class="section">
-      <div class="sec-head crit"><div class="sec-num">2</div><div class="sec-title">Action prioritaire — à faire maintenant</div></div>
-      <div class="sec-body">
-        <ul class="checklist">
-          <li class="check-item" data-field="VersionVerifiee">
-            <input type="checkbox">
-            <div class="ct"><b>Vérifier la version</b><span>Connexion à l'instance (dashboard ou <code class="inline">wp-cli</code>) et relevé de la version installée.</span></div>
-          </li>
-          <li class="check-item" data-field="MiseAJourAppliquee">
-            <input type="checkbox">
-            <div class="ct"><b>Mettre à jour immédiatement</b><span>6.9.5 pour la branche 6.9 · 7.0.2 pour la branche 7.0 · 6.8.6 pour les sites en 6.8.x.</span></div>
-          </li>
-          <li class="check-item" data-field="MajForceeVerifiee">
-            <input type="checkbox">
-            <div class="ct"><b>Contrôler l'application effective</b><span>Vérifier que la mise à jour forcée a bien été appliquée, même si les mises à jour automatiques sont activées.</span></div>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="sec-head warn"><div class="sec-num">3</div><div class="sec-title">Mesures temporaires si la mise à jour est impossible</div></div>
-      <div class="sec-body">
-        <p>Pas de WAF disponible : ces mesures s'appliquent au niveau du reverse proxy, sur l'instance si elle est exposée à Internet, jusqu'au patch.</p>
-        <ul class="checklist">
-          <li class="check-item" data-field="WAFBlocagePath">
-            <input type="checkbox">
-            <div class="ct"><b>Bloquer <code class="inline">/wp-json/batch/v1</code></b><span>Au niveau du reverse proxy.</span></div>
-          </li>
-          <li class="check-item" data-field="WAFBlocageQuery">
-            <input type="checkbox">
-            <div class="ct"><b>Bloquer <code class="inline">?rest_route=/batch/v1</code></b><span>Au niveau du reverse proxy — les deux formes de la requête doivent être filtrées.</span></div>
-          </li>
-          <li class="check-item" data-field="RestApiRestreinte">
-            <input type="checkbox">
-            <div class="ct"><b>Restreindre l'API REST anonyme</b><span>Si possible fonctionnellement, via plugin ou configuration dédiée.</span></div>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="sec-head"><div class="sec-num">4</div><div class="sec-title">Vérifications a posteriori</div></div>
-      <div class="sec-body">
-        <ul class="checklist">
-          <li class="check-item" data-field="LogsControles">
-            <input type="checkbox">
-            <div class="ct"><b>Contrôler les journaux HTTP</b><span>Rechercher les accès à <code class="inline">/wp-json/batch/v1</code> ou <code class="inline">?rest_route=/batch/v1</code>, avant et après la mise à jour.</span></div>
-          </li>
-          <li class="check-item" data-field="FichiersControles">
-            <input type="checkbox">
-            <div class="ct"><b>Contrôler les fichiers et comptes</b><span>Présence de fichiers PHP récents/suspects, création récente de comptes administrateurs.</span></div>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="progress-wrap">
-      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
-      <div class="progress-label"><span id="progress-count">0 / 7 étapes traitées</span><span id="progress-pct">0 %</span></div>
-    </div>
-    </div>
-
-    <div class="record">
-      <div class="record-title">Notes de l'agent</div>
-      <textarea id="notes" placeholder="Constat, mesures appliquées, points d'attention…"></textarea>
-      <div class="save-hint" id="save-hint">—</div>
-    </div>
-
-  </div>
+  <div class="empty-vuln hidden" id="empty-vuln">Aucune vulnérabilité active. Ajoute une ligne dans la table "Vulnerabilites" pour commencer.</div>
 
 </div>
 
 <script>
-  const FIELD_KEYS = ['VersionVerifiee','MiseAJourAppliquee','MajForceeVerifiee','WAFBlocagePath','WAFBlocageQuery','RestApiRestreinte','LogsControles','FichiersControles'];
-  const checkItems = Array.from(document.querySelectorAll('.check-item'));
-
   const statusDot = document.getElementById('status-dot');
   const statusText = document.getElementById('status-text');
+  const saveToast = document.getElementById('save-toast');
+  const vulnSelect = document.getElementById('vuln-select');
+  const vulnContent = document.getElementById('vuln-content');
+  const emptyVuln = document.getElementById('empty-vuln');
+  const badgeRow = document.getElementById('badge-row');
+  const vulnTitleEl = document.getElementById('vuln-title');
+  const vulnLedeEl = document.getElementById('vuln-lede');
+  const pathBlock = document.getElementById('path-block');
+  const pathRow = document.getElementById('path-row');
+  const versionsSection = document.getElementById('versions-section');
+  const versionsTable = document.getElementById('versions-table');
+  const checklistSections = document.getElementById('checklist-sections');
+
   const instanceListEl = document.getElementById('instance-list');
   const instancesCountEl = document.getElementById('instances-count');
   const emptyStateEl = document.getElementById('empty-state');
@@ -422,7 +370,6 @@
   const addCancel = document.getElementById('add-cancel');
   const addStatus = document.getElementById('add-status');
   const searchInput = document.getElementById('search-input');
-  const gatePill = document.getElementById('gate-pill');
   const notesEl = document.getElementById('notes');
   const saveHint = document.getElementById('save-hint');
 
@@ -435,34 +382,165 @@
   const remediationBlocks = document.getElementById('remediation-blocks');
 
   let gristConnected = false;
-  let records = [];
+  let records = [];          // toutes les lignes de Suivi_Vulnerabilites
+  let vulnDefs = {};         // id -> définition parsée
+  let vulnList = [];         // [{id, titre, active}] triés
+  let currentVulnId = null;
   let selectedId = null;
   let saveTimer = null;
   let demoAutoId = 1;
 
-  function pctForRecord(r){
-    if (r.Statut === 'Non vulnérable') return 100;
-    const done = FIELD_KEYS.filter(k => !!r[k]).length;
-    return Math.round((done / FIELD_KEYS.length) * 100);
+  function safeParseJSON(s, fallback){
+    if (!s) return fallback;
+    try { const v = JSON.parse(s); return v == null ? fallback : v; } catch (e) { return fallback; }
   }
 
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  function severiteClass(sev){
+    const s = (sev || '').toLowerCase();
+    if (s === 'haute') return 'severite-haute';
+    if (s === 'moyenne') return 'severite-moyenne';
+    if (s === 'basse') return 'severite-basse';
+    return '';
+  }
+
+  function currentDef(){
+    return vulnDefs[currentVulnId] || null;
+  }
+
+  // ---------------------------------------------------------------
+  // Sélecteur de vulnérabilité
+  // ---------------------------------------------------------------
+  function renderVulnSwitcher(){
+    vulnSelect.innerHTML = '';
+    const active = vulnList.filter(v => v.active);
+    if (!active.length) {
+      vulnContent.classList.add('hidden');
+      emptyVuln.classList.remove('hidden');
+      return;
+    }
+    vulnContent.classList.remove('hidden');
+    emptyVuln.classList.add('hidden');
+    active.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.id;
+      opt.textContent = v.titre;
+      vulnSelect.appendChild(opt);
+    });
+    if (!currentVulnId || !vulnDefs[currentVulnId] || !vulnDefs[currentVulnId].active) {
+      currentVulnId = active[0].id;
+    }
+    vulnSelect.value = currentVulnId;
+  }
+
+  vulnSelect.addEventListener('change', (e) => {
+    currentVulnId = Number(e.target.value);
+    selectedId = null;
+    renderVulnContent();
+    renderList();
+    detailEl.classList.add('hidden');
+  });
+
+  function renderVulnContent(){
+    const def = currentDef();
+    if (!def) return;
+
+    badgeRow.innerHTML =
+      '<span class="sev ' + severiteClass(def.severite) + '">' + escapeHtml((def.severite || 'CRITIQUE').toUpperCase()) + '</span>' +
+      (def.cves || []).map(c => '<span class="cve">' + escapeHtml(c) + '</span>').join('');
+
+    vulnTitleEl.textContent = def.titre || '(sans titre)';
+
+    const liens = (def.liens || []).map(l => '<a href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener">' + escapeHtml(l.label) + '</a>').join(' · ');
+    vulnLedeEl.innerHTML = escapeHtml(def.resume || '') + (liens ? '<br>' + liens : '');
+
+    if (def.chemin && def.chemin.length) {
+      pathBlock.style.display = '';
+      pathRow.innerHTML = def.chemin.map((node, i) => {
+        const cls = node.type === 'rce' ? 'node rce' : (node.type === 'route' ? 'node route mono' : 'node anon');
+        const html = '<div class="' + cls + '">' + escapeHtml(node.label) + '</div>';
+        return i < def.chemin.length - 1 ? html + '<div class="arrow">→</div>' : html;
+      }).join('');
+    } else {
+      pathBlock.style.display = 'none';
+    }
+
+    if (def.versions && def.versions.length) {
+      versionsSection.style.display = '';
+      versionsTable.innerHTML = def.versions.map(v =>
+        '<tr><td>' + escapeHtml(v.label) + '</td><td class="mono">' + escapeHtml(v.versions) + '</td></tr>'
+      ).join('');
+    } else {
+      versionsSection.style.display = 'none';
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Chargement des définitions de vulnérabilités
+  // ---------------------------------------------------------------
+  function loadVulnDefs(){
+    if (!window.grist || !grist.docApi || !grist.docApi.fetchTable) return Promise.resolve();
+    return grist.docApi.fetchTable('Vulnerabilites').then(data => {
+      const ids = data.id || [];
+      vulnDefs = {};
+      vulnList = [];
+      ids.forEach((id, i) => {
+        const def = {
+          id: id,
+          titre: data.Titre ? data.Titre[i] : '',
+          slug: data.Slug ? data.Slug[i] : '',
+          cves: (data.CVEs ? String(data.CVEs[i] || '') : '').split(',').map(s => s.trim()).filter(Boolean),
+          severite: data.Severite ? data.Severite[i] : '',
+          resume: data.Resume ? data.Resume[i] : '',
+          chemin: safeParseJSON(data.CheminExploitationJSON ? data.CheminExploitationJSON[i] : null, []),
+          versions: safeParseJSON(data.VersionsAffecteesJSON ? data.VersionsAffecteesJSON[i] : null, []),
+          checklist: safeParseJSON(data.ChecklistJSON ? data.ChecklistJSON[i] : null, []),
+          liens: safeParseJSON(data.LiensJSON ? data.LiensJSON[i] : null, []),
+          active: data.Active ? !!data.Active[i] : true
+        };
+        vulnDefs[id] = def;
+        vulnList.push({ id: id, titre: def.titre, active: def.active });
+      });
+      renderVulnSwitcher();
+      renderVulnContent();
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Progression / statut d'une instance
+  // ---------------------------------------------------------------
+  function pctForRecord(r){
+    const def = vulnDefs[r.Vulnerabilite];
+    if (!def) return 0;
+    if (r.Statut === 'Non vulnérable') return 100;
+    const items = def.checklist || [];
+    if (!items.length) return 0;
+    const etat = safeParseJSON(r.ChecklistEtatJSON, {});
+    const done = items.filter(it => !!etat[it.id]).length;
+    return Math.round((done / items.length) * 100);
+  }
+
+  // ---------------------------------------------------------------
+  // Liste des instances (filtrée sur la vulnérabilité courante)
+  // ---------------------------------------------------------------
   function renderList(){
     instanceListEl.innerHTML = '';
-    instancesCountEl.textContent = records.length + (records.length > 1 ? ' instances' : ' instance');
+    const scoped = records.filter(r => r.Vulnerabilite === currentVulnId);
+    instancesCountEl.textContent = scoped.length + (scoped.length > 1 ? ' instances' : ' instance');
+    addBtn.disabled = !currentVulnId;
 
     const q = searchInput.value.trim().toLowerCase();
     const visible = q
-      ? records.filter(r => (r.Site || '').toLowerCase().includes(q) || (r.Agent || '').toLowerCase().includes(q) || (r.URL || '').toLowerCase().includes(q))
-      : records;
+      ? scoped.filter(r => (r.Site || '').toLowerCase().includes(q) || (r.Agent || '').toLowerCase().includes(q) || (r.URL || '').toLowerCase().includes(q))
+      : scoped;
 
-    emptyStateEl.style.display = records.length ? 'none' : 'block';
-    instanceListEl.style.display = records.length ? 'block' : 'none';
+    emptyStateEl.style.display = scoped.length ? 'none' : 'block';
+    instanceListEl.style.display = scoped.length ? 'block' : 'none';
 
-    if (records.length && q && !visible.length) {
+    if (scoped.length && q && !visible.length) {
       const li = document.createElement('li');
       li.className = 'no-match';
       li.textContent = 'Aucune instance ne correspond à « ' + searchInput.value.trim() + ' ».';
@@ -487,10 +565,66 @@
     });
   }
 
+  // ---------------------------------------------------------------
+  // Checklist dynamique (regroupée par section, ordre d'apparition)
+  // ---------------------------------------------------------------
+  function renderChecklistSections(def, etat){
+    checklistSections.innerHTML = '';
+    const items = def ? (def.checklist || []) : [];
+    const sectionsSeen = [];
+    const bySection = {};
+    items.forEach(it => {
+      const key = it.section || 'general';
+      if (!bySection[key]) { bySection[key] = []; sectionsSeen.push(key); }
+      bySection[key].push(it);
+    });
+
+    sectionsSeen.forEach((key, idx) => {
+      const group = bySection[key];
+      const label = group[0].sectionLabel || key;
+      const headClass = key === 'prioritaire' ? 'prioritaire' : (key === 'temporaire' ? 'temporaire' : '');
+      const section = document.createElement('div');
+      section.className = 'section';
+      section.innerHTML =
+        '<div class="sec-head ' + headClass + '"><div class="sec-num">' + (idx + 1) + '</div><div class="sec-title">' + escapeHtml(label) + '</div></div>' +
+        '<div class="sec-body"><ul class="checklist"></ul></div>';
+      const ul = section.querySelector('.checklist');
+      group.forEach(it => {
+        const checked = !!etat[it.id];
+        const li = document.createElement('li');
+        li.className = 'check-item' + (checked ? ' done' : '');
+        li.dataset.field = it.id;
+        li.innerHTML =
+          '<input type="checkbox" ' + (checked ? 'checked' : '') + '>' +
+          '<div class="ct"><b>' + escapeHtml(it.titre) + '</b><span>' + escapeHtml(it.description || '') + '</span></div>';
+        li.addEventListener('click', (e) => {
+          if (e.target.tagName !== 'INPUT') li.querySelector('input').checked = !li.querySelector('input').checked;
+          const isChecked = li.querySelector('input').checked;
+          li.classList.toggle('done', isChecked);
+          saveChecklistItem(it.id, isChecked);
+        });
+        ul.appendChild(li);
+      });
+      checklistSections.appendChild(section);
+    });
+
+    updateProgress(def, etat);
+  }
+
+  function updateProgress(def, etat){
+    const items = def ? (def.checklist || []) : [];
+    const done = items.filter(it => !!etat[it.id]).length;
+    const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-count').textContent = done + ' / ' + items.length + ' étapes traitées';
+    document.getElementById('progress-pct').textContent = pct + ' %';
+  }
+
   function selectInstance(id){
     selectedId = id;
     const r = records.find(x => x.id === id);
     if (!r) { detailEl.classList.add('hidden'); return; }
+    const def = vulnDefs[r.Vulnerabilite] || currentDef();
     detailEl.classList.remove('hidden');
 
     siteField.value = r.Site || '';
@@ -501,14 +635,10 @@
     statusField.value = r.Statut || '';
     applyStatusView(r.Statut || '');
 
-    checkItems.forEach(item => {
-      const checked = !!r[item.dataset.field];
-      item.classList.toggle('done', checked);
-      item.querySelector('input').checked = checked;
-    });
+    const etat = safeParseJSON(r.ChecklistEtatJSON, {});
+    renderChecklistSections(def, etat);
 
     saveHint.textContent = gristConnected ? 'Enregistré dans Grist.' : 'Mode démo — non enregistré.';
-    updateProgress();
     renderList();
   }
 
@@ -523,26 +653,11 @@
     saveField('Statut', e.target.value);
   });
 
-  function updateProgress(){
-    const done = checkItems.filter(i => i.classList.contains('done')).length;
-    const pct = Math.round((done / checkItems.length) * 100);
-    document.getElementById('progress-fill').style.width = pct + '%';
-    document.getElementById('progress-count').textContent = done + ' / ' + checkItems.length + ' étapes traitées';
-    document.getElementById('progress-pct').textContent = pct + ' %';
-
-    const wafDone = document.querySelector('[data-field="WAFBlocagePath"]').classList.contains('done')
-      && document.querySelector('[data-field="WAFBlocageQuery"]').classList.contains('done');
-    const maj = document.querySelector('[data-field="MiseAJourAppliquee"]').classList.contains('done');
-    gatePill.textContent = maj ? 'MAJ appliquée' : (wafDone ? 'bloqué' : 'à activer');
-    gatePill.classList.toggle('blocked', maj || wafDone);
-  }
-
   function patchLocalRecord(id, fields){
     const r = records.find(x => x.id === id);
     if (r) Object.assign(r, fields);
   }
 
-  const saveToast = document.getElementById('save-toast');
   let toastTimer = null;
   function flashToast(ok, msg){
     clearTimeout(toastTimer);
@@ -565,15 +680,16 @@
       });
   }
 
-  checkItems.forEach(item => {
-    item.addEventListener('click', (e) => {
-      if (e.target.tagName !== 'INPUT') item.querySelector('input').checked = !item.querySelector('input').checked;
-      const checked = item.querySelector('input').checked;
-      item.classList.toggle('done', checked);
-      updateProgress();
-      saveField(item.dataset.field, checked);
-    });
-  });
+  function saveChecklistItem(itemId, checked){
+    if (selectedId == null) return;
+    const r = records.find(x => x.id === selectedId);
+    const etat = safeParseJSON(r ? r.ChecklistEtatJSON : null, {});
+    etat[itemId] = checked;
+    const json = JSON.stringify(etat);
+    const def = vulnDefs[r ? r.Vulnerabilite : currentVulnId];
+    updateProgress(def, etat);
+    saveField('ChecklistEtatJSON', json);
+  }
 
   [['site-field','Site'], ['url-field','URL'], ['version-field','VersionActuelle'], ['agent-field','Agent']].forEach(([elId, field]) => {
     document.getElementById(elId).addEventListener('change', (e) => saveField(field, e.target.value));
@@ -586,6 +702,7 @@
   });
 
   addBtn.addEventListener('click', () => {
+    if (!currentVulnId) return;
     addForm.classList.add('open');
     addStatus.className = ''; addStatus.textContent = '';
     newSiteInput.focus();
@@ -602,7 +719,8 @@
     const url = newUrlInput.value.trim();
     const agent = newAgentInput.value.trim();
     if (!site) { newSiteInput.focus(); return; }
-    const fields = { Site: site, URL: url, Agent: agent };
+    if (!currentVulnId) return;
+    const fields = { Site: site, URL: url, Agent: agent, Vulnerabilite: currentVulnId, ChecklistEtatJSON: '{}' };
     addStatus.className = 'info';
     addStatus.textContent = 'Création en cours…';
 
@@ -640,39 +758,46 @@
   if (window.grist) {
     grist.ready({
       columns: [
+        { name: 'Vulnerabilite', title: 'Vulnérabilité' },
         { name: 'Site', title: 'Site / instance' },
         { name: 'URL', title: 'URL', optional: true },
         { name: 'VersionActuelle', title: 'Version actuelle', optional: true },
-        { name: 'VersionVerifiee', title: 'Version vérifiée', type: 'Bool' },
-        { name: 'MiseAJourAppliquee', title: 'Mise à jour appliquée', type: 'Bool' },
-        { name: 'MajForceeVerifiee', title: 'MAJ forcée vérifiée', type: 'Bool' },
-        { name: 'WAFBlocagePath', title: 'WAF — chemin bloqué', type: 'Bool' },
-        { name: 'WAFBlocageQuery', title: 'WAF — query bloquée', type: 'Bool' },
-        { name: 'RestApiRestreinte', title: 'API REST restreinte', type: 'Bool' },
-        { name: 'LogsControles', title: 'Logs contrôlés', type: 'Bool' },
-        { name: 'FichiersControles', title: 'Fichiers/comptes contrôlés', type: 'Bool' },
-        { name: 'Notes', title: 'Notes', type: 'Text', optional: true },
         { name: 'Agent', title: 'Agent en charge', optional: true },
         { name: 'Statut', title: 'Statut vulnérabilité', optional: true },
+        { name: 'ChecklistEtatJSON', title: 'État checklist (JSON)', type: 'Text', optional: true },
+        { name: 'Notes', title: 'Notes', type: 'Text', optional: true },
       ],
       requiredAccess: 'full'
     });
 
-    grist.onRecords(function (recs, mappings) {
-      gristConnected = true;
-      statusDot.className = 'live';
-      statusText.textContent = 'Connecté au document Grist — création et modifications enregistrées automatiquement.';
+    loadVulnDefs().then(() => {
+      grist.onRecords(function (recs, mappings) {
+        gristConnected = true;
+        statusDot.className = 'live';
+        statusText.textContent = 'Connecté au document Grist — création et modifications enregistrées automatiquement.';
 
-      records = recs.map(r => Object.assign({ id: r.id }, r, grist.mapColumnNames(r, mappings) || {}));
-      if (!records.find(r => r.id === selectedId)) {
-        selectedId = records.length ? records[0].id : null;
-      }
-      renderList();
-      if (selectedId != null) selectInstance(selectedId); else detailEl.classList.add('hidden');
+        records = recs.map(r => {
+          const mapped = grist.mapColumnNames(r, mappings) || {};
+          const rec = Object.assign({ id: r.id }, r, mapped);
+          if (rec.Vulnerabilite && typeof rec.Vulnerabilite === 'object' && 'value' in rec.Vulnerabilite) {
+            rec.Vulnerabilite = rec.Vulnerabilite.value;
+          }
+          return rec;
+        });
+        if (!records.find(r => r.id === selectedId)) {
+          selectedId = null;
+          detailEl.classList.add('hidden');
+        }
+        renderList();
+        if (selectedId != null) selectInstance(selectedId);
+      });
     });
   } else {
     statusDot.className = 'demo';
     statusText.textContent = 'Mode démo (hors Grist) — aperçu uniquement, rien n\'est enregistré.';
+    vulnDefs = {};
+    vulnList = [];
+    renderVulnSwitcher();
     renderList();
   }
 </script>
