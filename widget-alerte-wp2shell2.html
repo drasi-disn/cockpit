@@ -232,7 +232,7 @@
   <span id="status-text">Connexion au document Grist…</span>
   <span id="save-toast"></span>
 </div>
-<div id="debug-info" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#F4A100;background:#182338;padding:6px 20px;border-bottom:1px solid #243350;white-space:pre-wrap;">DEBUG: en attente…</div>
+<div id="debug-info" style="display:none;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#F4A100;background:#182338;padding:6px 20px;border-bottom:1px solid #243350;white-space:pre-wrap;">DEBUG: en attente…</div>
 
 <div class="wrap">
 
@@ -775,11 +775,16 @@
   newSiteInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
   newAgentInput.addEventListener('keydown', e => { if (e.key === 'Enter') createInstance(); });
 
+  // Bandeau de debug masqué par défaut ; ajouter ?debug=1 à l'URL du widget
+  // pour l'afficher (utile pour ré-investiguer sans repasser par le code).
+  const debugMode = new URLSearchParams(window.location.search).get('debug') === '1';
+  const debugInfoEl = document.getElementById('debug-info');
+  if (debugMode && debugInfoEl) debugInfoEl.style.display = 'block';
+
   const debugLines = [];
   function debugLog(msg){
     debugLines.push('[' + new Date().toISOString().slice(11,19) + '] ' + msg);
-    const debugEl = document.getElementById('debug-info');
-    if (debugEl) debugEl.textContent = debugLines.join('\n');
+    if (debugInfoEl) debugInfoEl.textContent = debugLines.join('\n');
   }
 
   let vulnDefsLoaded = false;
