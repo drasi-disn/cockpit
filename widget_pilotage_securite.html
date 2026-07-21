@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <title>Pilotage Sécurité OS</title>
 <!-- API Grist Custom Widget : obligatoire pour lire les tables du document -->
-<script src="https://docs.getgrist.com/grist-plugin/api.js"></script>
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 <style>
   :root {
     --critique: #B71C1C;
@@ -220,12 +220,7 @@ const COLORS = {
 // ============================================================
 // Entrée : déclaration du widget auprès de Grist
 // ============================================================
-grist.ready({ columns: [], tables: [
-  { name: TABLE_VM },
-  { name: TABLE_OS_REF },
-  { name: TABLE_KPI },
-  { name: TABLE_RAPPORTS }
-]});
+grist.ready({ columns: [], requiredAccess: 'full' });
 
 grist.onRecords(function(records, mappings) {
   // Grist appelle ce callback à chaque changement de données
@@ -346,10 +341,10 @@ function renderDonut(vms) {
   }
   const total = vms.length || 1;
   const segments = [
-    { label: 'À jour',       key: 'A_JOUR',     color: COLORS.A_JOUR },
+    { label: 'à jour',       key: 'A_JOUR',     color: COLORS.A_JOUR },
     { label: 'Non à jour',   key: 'NON_A_JOUR', color: COLORS.NON_A_JOUR },
-    { label: 'À vérifier',   key: 'A_VERIFIER', color: COLORS.A_VERIFIER },
-    { label: 'À surveiller', key: 'A_SURVEILLER', color: COLORS.A_SURVEILLER }
+    { label: 'à vérifier',   key: 'A_VERIFIER', color: COLORS.A_VERIFIER },
+    { label: 'à surveiller', key: 'A_SURVEILLER', color: COLORS.A_SURVEILLER }
   ];
 
   // Conic gradient pour le donut
