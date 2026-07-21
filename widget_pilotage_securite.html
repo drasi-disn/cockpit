@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Pilotage Sécurité OS</title>
+<!-- API Grist Custom Widget : obligatoire pour lire les tables du document -->
+<script src="https://docs.getgrist.com/grist-plugin/api.js"></script>
+<style>
+  :root {
+    --critique: #B71C1C;
+    --eleve:   #E65100;
+    --moyen:   #FFC107;
+    --faible:  #2E7D32;
+    --verifier:#BDBDBD;
+    --bg:      #f5f6f8;
+    --card:    #ffffff;
+    --border:  #e1e4e8;
+    --text:    #1a1a1a;
+    --muted:   #6a737d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+    font-size: 13px;
+  }
+  h1 {
+    font-size: 18px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h1 .subtitle { font-size: 12px; color: var(--muted); font-weight: normal; }
+
+  .refresh {
+    float: right;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .refresh:hover { background: #eef0f2; }
+
+  /* --- KPI Cards --- */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .kpi {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    border-left: 4px solid var(--verifier);
+  }
+  .kpi.ok      { border-left-color: var(--faible); }
+  .kpi.ko      { border-left-color: var(--critique); }
+  .kpi.warn    { border-left-color: var(--moyen); }
+  .kpi.critic  { border-left-color: var(--critique); }
+  .kpi .label  { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi .value  { font-size: 26px; font-weight: 700; margin-top: 2px; }
+  .kpi .pct    { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* --- Donut --- */
+  .donut-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .donut-section h2 { font-size: 14px; margin-bottom: 10px; }
+  .donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .donut {
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .donut::after {
+    content: '';
+    position: absolute;
+    top: 25px; left: 25px;
+    width: 110px; height: 110px;
+    background: var(--card);
+    border-radius: 50%;
+  }
+  .donut-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 2;
+  }
+  .donut-center .big { font-size: 22px; font-weight: 700; }
+  .donut-center .small { font-size: 10px; color: var(--muted); }
+  .legend { display: flex; flex-direction: column; gap: 6px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 2px; }
+
+  /* --- Risk Matrix --- */
+  .matrix-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .matrix-section h2 { font-size: 14px; margin-bottom: 10px; }
+  table.matrix {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.matrix th, table.matrix td {
+    border: 1px solid var(--border);
+    padding: 6px 8px;
+    text-align: left;
+  }
+  table.matrix th { background: #f0f2f5; font-weight: 600; }
+  table.matrix td.num { text-align: right; font-weight: 600; }
+  table.matrix tr:hover td { background: #fafbfc; }
+  .crit-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+  }
+  .crit-Critique   { background: var(--critique); }
+  .crit-Élevé       { background: var(--eleve); }
+  .crit-Moyen       { background: var(--moyen); color: #000; }
+  .crit-Faible      { background: var(--faible); }
+  .crit-Àconfirmer  { background: var(--verifier); color: #000; }
+  .crit-Inconnu     { background: #e0e0e0; color: #000; }
+
+  /* --- Trend --- */
+  .trend-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .trend-section h2 { font-size: 14px; margin-bottom: 10px; }
+  .trend-bars { display: flex; align-items: flex-end; gap: 8px; height: 120px; padding-top: 10px; }
+  .trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px; }
+  .trend-bar {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    position: relative;
+    min-height: 2px;
+    transition: height 0.4s;
+  }
+  .trend-bar .pct-label {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .trend-date { font-size: 10px; color: var(--muted); text-align: center; }
+
+  .error { color: var(--critique); padding: 20px; text-align: center; }
+  .loading { color: var(--muted); padding: 30px; text-align: center; }
+</style>
+</head>
+<body>
+  <div id="loading" class="loading">Chargement des données du document Grist…</div>
+  <div id="content" style="display:none;">
+    <h1>
+      🛡️ Pilotage Sécurité — Mise à jour OS VMware
+      <span class="subtitle" id="docMeta"></span>
+    </h1>
+    <button class="refresh" onclick="loadData()">↻ Actualiser</button>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+    <div class="donut-section">
+      <h2>Répartition du parc par statut de mise à jour</h2>
+      <div class="donut-wrap" id="donutWrap"></div>
+    </div>
+    <div class="matrix-section">
+      <h2>Matrice de risque par OS</h2>
+      <table class="matrix" id="matrixTable"></table>
+    </div>
+    <div class="trend-section">
+      <h2>Évolution du taux de mise à jour</h2>
+      <div class="trend-bars" id="trendBars"></div>
+    </div>
+  </div>
+  <div id="error" class="error" style="display:none;"></div>
+
+<script>
+// ============================================================
+// Configuration : noms des tables et colonnes dans le doc Grist
+// ============================================================
+const TABLE_VM        = 'VM';
+const TABLE_OS_REF    = 'OS_Referentiel';
+const TABLE_KPI       = 'KPI_Synthese';
+const TABLE_RAPPORTS  = 'Rapports';
+
+// Couleurs cohérentes avec les Choice du document Grist
+const COLORS = {
+  A_JOUR:      '#2E7D32',
+  NON_A_JOUR:  '#C62828',
+  A_VERIFIER:  '#FFC107',
+  A_SURVEILLER:'#90CAF9'
+};
+
+// ============================================================
+// Entrée : déclaration du widget auprès de Grist
+// ============================================================
+grist.ready({ columns: [], tables: [
+  { name: TABLE_VM },
+  { name: TABLE_OS_REF },
+  { name: TABLE_KPI },
+  { name: TABLE_RAPPORTS }
+]});
+
+grist.onRecords(function(records, mappings) {
+  // Grist appelle ce callback à chaque changement de données
+  loadData();
+});
+
+// Au chargement initial du widget
+loadData();
+
+// ============================================================
+// Lecture de toutes les tables via l'API Grist
+// ============================================================
+async function fetchTable(tableName) {
+  // Utilise grist.docApi.fetchTable qui retourne un objet colonne->array
+  return new Promise((resolve, reject) => {
+    grist.docApi.fetchTable(tableName).then(table => {
+      resolve(table);
+    }).catch(reject);
+  });
+}
+
+async function loadData() {
+  try {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('content').style.display = 'none';
+    document.getElementById('error').style.display = 'none';
+
+    const [vmData, osData, kpiData, rapportsData] = await Promise.all([
+      fetchTable(TABLE_VM),
+      fetchTable(TABLE_OS_REF),
+      fetchTable(TABLE_KPI),
+      fetchTable(TABLE_RAPPORTS)
+    ]);
+
+    // Transformation en tableau d'objets ligne
+    const vms      = tableToRows(vmData);
+    const osRef    = tableToRows(osData);
+    const kpis     = tableToRows(kpiData);
+    const rapports = tableToRows(rapportsData);
+
+    // Meta
+    const now = new Date().toLocaleString('fr-FR');
+    document.getElementById('docMeta').textContent =
+      `• ${vms.length} VM • MAJ ${now}`;
+
+    // Rendu
+    renderKPIs(kpis);
+    renderDonut(vms);
+    renderMatrix(vms, osRef);
+    renderTrend(rapports);
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+  } catch (e) {
+    console.error(e);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'none';
+    document.getElementById('error').style.display = 'block';
+    document.getElementById('error').textContent =
+      'Erreur de chargement : ' + (e.message || e) +
+      '\n\nVérifiez que le widget est bien configuré avec accès aux tables VM, OS_Referentiel, KPI_Synthese, Rapports.';
+  }
+}
+
+// Helper : convertit l'objet {col: [vals]} en [{col: val}, ...]
+function tableToRows(table) {
+  if (!table || !table.id) return [];
+  const keys = Object.keys(table);
+  const n = table.id.length;
+  const rows = [];
+  for (let i = 0; i < n; i++) {
+    const row = {};
+    for (const k of keys) {
+      row[k] = table[k][i];
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+// ============================================================
+// Rendu des cartes KPI
+// ============================================================
+function renderKPIs(kpis) {
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '';
+  const classMap = {
+    'Total VM':                    '',
+    'VM à jour (sécurité OK)':     'ok',
+    'VM non à jour (risque sécurité)':'ko',
+    'VM à vérifier':               'warn',
+    'VM critiques (fin de support)':'critic',
+    'VM Windows':                  '',
+    'VM Linux':                    '',
+    'VM sans OS identifié':        'warn'
+  };
+  for (const k of kpis) {
+    const div = document.createElement('div');
+    div.className = 'kpi ' + (classMap[k.Indicateur] || '');
+    div.innerHTML = `
+      <div class="label">${escapeHtml(k.Indicateur || '')}</div>
+      <div class="value">${k.Valeur != null ? k.Valeur : '—'}</div>
+      <div class="pct">${escapeHtml(k.Pourcentage || '')}</div>
+    `;
+    grid.appendChild(div);
+  }
+}
+
+// ============================================================
+// Donut : répartition par classification
+// ============================================================
+function renderDonut(vms) {
+  const counts = { A_JOUR: 0, NON_A_JOUR: 0, A_VERIFIER: 0, A_SURVEILLER: 0, AUTRE: 0 };
+  for (const v of vms) {
+    const c = v.Classification;
+    if (counts.hasOwnProperty(c)) counts[c]++;
+    else counts.AUTRE++;
+  }
+  const total = vms.length || 1;
+  const segments = [
+    { label: 'À jour',       key: 'A_JOUR',     color: COLORS.A_JOUR },
+    { label: 'Non à jour',   key: 'NON_A_JOUR', color: COLORS.NON_A_JOUR },
+    { label: 'À vérifier',   key: 'A_VERIFIER', color: COLORS.A_VERIFIER },
+    { label: 'À surveiller', key: 'A_SURVEILLER', color: COLORS.A_SURVEILLER }
+  ];
+
+  // Conic gradient pour le donut
+  let cumul = 0;
+  const stops = segments.map(s => {
+    const pct = counts[s.key] / total;
+    const start = cumul * 360;
+    cumul += pct;
+    const end = cumul * 360;
+    return `${s.color} ${start}deg ${end}deg`;
+  }).join(', ');
+
+  const donutWrap = document.getElementById('donutWrap');
+  const pctOk = ((counts.A_JOUR / total) * 100).toFixed(1);
+  donutWrap.innerHTML = `
+    <div class="donut" style="background: conic-gradient(${stops});">
+      <div class="donut-center">
+        <div class="big" style="color:${COLORS.A_JOUR};">${pctOk}%</div>
+        <div class="small">parc à jour</div>
+      </div>
+    </div>
+    <div class="legend">
+      ${segments.map(s => `
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${s.color};"></div>
+          <span>${s.label} : <strong>${counts[s.key]}</strong> (${(counts[s.key]/total*100).toFixed(1)}%)</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ============================================================
+// Matrice de risque : agrégation par OS
+// ============================================================
+function renderMatrix(vms, osRef) {
+  const tbl = document.getElementById('matrixTable');
+
+  // Map rowId OS -> données référentiel
+  const osById = {};
+  for (const o of osRef) osById[o.id] = o;
+
+  // Agréger : pour chaque OS, nb VM et criticité
+  const matrix = {};
+  for (const v of vms) {
+    const refId = v.OS_reference;
+    if (!refId) continue;
+    if (!matrix[refId]) {
+      const o = osById[refId] || {};
+      matrix[refId] = {
+        os: o.OS || '(inconnu)',
+        statut: o.Statut || '',
+        criticite: o.Criticite || '',
+        classification: o.Classification || '',
+        detail: o.Detail_Securite || '',
+        nb: 0
+      };
+    }
+    matrix[refId].nb++;
+  }
+
+  // Trier par nb VM décroissant, criticité prioritaire
+  const critOrder = {'Critique':0,'Élevé':1,'Moyen':2,'À confirmer':3,'Faible':4,'Inconnu':5};
+  const rows = Object.values(matrix).sort((a,b) => {
+    const c = (critOrder[a.criticite] ?? 9) - (critOrder[b.criticite] ?? 9);
+    if (c !== 0) return c;
+    return b.nb - a.nb;
+  });
+
+  tbl.innerHTML = `
+    <thead>
+      <tr>
+        <th>Criticité</th>
+        <th>OS</th>
+        <th>Statut support</th>
+        <th style="width:80px;">Nb VM</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(r => `
+        <tr>
+          <td><span class="crit-badge crit-${escapeAttr(r.criticite.replace(/\s/g,''))}">${escapeHtml(r.criticite || '—')}</span></td>
+          <td>${escapeHtml(r.os)}</td>
+          <td>${escapeHtml(r.statut)}${r.detail ? ' <span style="color:#6a737d;">('+escapeHtml(r.detail)+')</span>' : ''}</td>
+          <td class="num">${r.nb}</td>
+        </tr>
+      `).join('')}
+    </tbody>
+  `;
+}
+
+// ============================================================
+// Évolution : barres par date de rapport
+// ============================================================
+function renderTrend(rapports) {
+  const wrap = document.getElementById('trendBars');
+  if (!rapports.length) {
+    wrap.innerHTML = '<div style="color:#6a737d;font-size:12px;">Aucun historique disponible.</div>';
+    return;
+  }
+  // Trier par date croissante
+  const sorted = [...rapports].sort((a,b) => new Date(a.Date_Run) - new Date(b.Date_Run));
+  const maxPct = 100;
+  wrap.innerHTML = sorted.map(r => {
+    const pct = Number(r.Pct_A_JOUR) || 0;
+    const date = new Date(r.Date_Run);
+    const dateStr = date.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+    const height = (pct / maxPct) * 100;
+    const color = pct >= 70 ? COLORS.A_JOUR : pct >= 50 ? COLORS.A_VERIFIER : COLORS.NON_A_JOUR;
+    return `
+      <div class="trend-col">
+        <div class="trend-bar" style="height:${height}%; background:${color};">
+          <span class="pct-label">${pct.toFixed(1)}%</span>
+        </div>
+        <div class="trend-date">${dateStr}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// Helpers d'échappement HTML
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/[^a-zA-Z0-9-_]/g, '');
+}
+</script>
+</body>
+</html>
