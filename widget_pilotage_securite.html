@@ -559,11 +559,11 @@ function renderTrend(rapports) {
     return;
   }
   // Trier par date croissante
-  const sorted = [...rapports].sort((a,b) => new Date(a.Date_Run) - new Date(b.Date_Run));
+  const sorted = [...rapports].sort((a,b) => new Date(a.Date_Run * 1000) - new Date(b.Date_Run * 1000));
   const maxPct = 100;
   wrap.innerHTML = sorted.map(r => {
     const pct = Number(r.Pct_A_JOUR) || 0;
-    const date = new Date(r.Date_Run);
+    const date = new Date(r.Date_Run * 1000);
     const dateStr = date.toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'2-digit'});
     const height = (pct / maxPct) * 100;
     const color = pct >= 70 ? COLORS.A_JOUR : pct >= 50 ? COLORS.A_VERIFIER : COLORS.NON_A_JOUR;
