@@ -171,12 +171,12 @@
     color: #000; /* couleur par défaut lisible : évite le texte blanc-sur-blanc
                     quand la classe crit-XXX ne correspond à aucune règle ci-dessous */
   }
-  .crit-Critique   { background: var(--critique); color: #fff; }
-  .crit-Élevé       { background: var(--eleve); color: #fff; }
-  .crit-Moyen       { background: var(--moyen); color: #000; }
-  .crit-Faible      { background: var(--faible); color: #fff; }
-  .crit-Àconfirmer  { background: var(--verifier); color: #000; }
-  .crit-Inconnu     { background: #e0e0e0; color: #000; }
+  .crit-critique   { background: var(--critique); color: #fff; }
+  .crit-eleve       { background: var(--eleve); color: #fff; }
+  .crit-moyen       { background: var(--moyen); color: #000; }
+  .crit-faible      { background: var(--faible); color: #fff; }
+  .crit-aconfirmer  { background: var(--verifier); color: #000; }
+  .crit-inconnu     { background: #e0e0e0; color: #000; }
 
   /* --- Trend --- */
   .trend-section {
@@ -431,6 +431,20 @@ function renderDonut(vms) {
 // ============================================================
 const CRIT_ORDER = {'Critique':0,'Élevé':1,'Moyen':2,'À confirmer':3,'Faible':4,'Inconnu':5};
 
+// Correspondance explicite texte -> classe CSS : on évite de dériver la classe
+// du texte affiché (accents, espaces), ce qui était la cause du bug précédent.
+const CRIT_CLASS = {
+  'Critique':     'crit-critique',
+  'Élevé':        'crit-eleve',
+  'Moyen':        'crit-moyen',
+  'Faible':       'crit-faible',
+  'À confirmer':  'crit-aconfirmer',
+  'Inconnu':      'crit-inconnu'
+};
+function criticiteClass(criticite) {
+  return CRIT_CLASS[criticite] || 'crit-inconnu';
+}
+
 function renderMatrix(vms, osRef) {
   // Map rowId OS -> données référentiel
   const osById = {};
@@ -525,7 +539,7 @@ function renderMatrixTable() {
     <tbody>
       ${rows.map(r => `
         <tr>
-          <td><span class="crit-badge crit-${escapeAttr(r.criticite.replace(/\s/g,''))}">${escapeHtml(r.criticite)}</span></td>
+          <td><span class="crit-badge ${criticiteClass(r.criticite)}">${escapeHtml(r.criticite)}</span></td>
           <td>${escapeHtml(r.os)}</td>
           <td>${escapeHtml(r.statut)}${r.detail ? ' <span style="color:#6a737d;">('+escapeHtml(r.detail)+')</span>' : ''}</td>
           <td class="num">${r.nb}</td>
