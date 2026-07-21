@@ -114,6 +114,41 @@
     margin-bottom: 14px;
   }
   .matrix-section h2 { font-size: 14px; margin-bottom: 10px; }
+
+  /* --- Filtres de la matrice --- */
+  .matrix-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .matrix-filters label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .matrix-filters select {
+    font-size: 12px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    color: var(--text);
+  }
+  .matrix-filters button {
+    font-size: 11px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--card);
+    cursor: pointer;
+    color: var(--text);
+  }
+  .matrix-filters button:hover { background: #eef0f2; }
+
   table.matrix {
     width: 100%;
     border-collapse: collapse;
@@ -133,12 +168,13 @@
     border-radius: 10px;
     font-size: 11px;
     font-weight: 600;
-    color: white;
+    color: #000; /* couleur par défaut lisible : évite le texte blanc-sur-blanc
+                    quand la classe crit-XXX ne correspond à aucune règle ci-dessous */
   }
-  .crit-Critique   { background: var(--critique); }
-  .crit-Élevé       { background: var(--eleve); }
+  .crit-Critique   { background: var(--critique); color: #fff; }
+  .crit-Élevé       { background: var(--eleve); color: #fff; }
   .crit-Moyen       { background: var(--moyen); color: #000; }
-  .crit-Faible      { background: var(--faible); }
+  .crit-Faible      { background: var(--faible); color: #fff; }
   .crit-Àconfirmer  { background: var(--verifier); color: #000; }
   .crit-Inconnu     { background: #e0e0e0; color: #000; }
 
@@ -191,6 +227,15 @@
     </div>
     <div class="matrix-section">
       <h2>Matrice de risque par OS</h2>
+      <div class="matrix-filters">
+        <label>Criticité :
+          <select id="filterCriticite"><option value="">Toutes</option></select>
+        </label>
+        <label>OS :
+          <select id="filterOS"><option value="">Tous</option></select>
+        </label>
+        <button type="button" id="resetFilters">↺ Réinitialiser</button>
+      </div>
       <table class="matrix" id="matrixTable"></table>
     </div>
     <div class="trend-section">
@@ -216,6 +261,10 @@ const COLORS = {
   A_VERIFIER:  '#FFC107',
   A_SURVEILLER:'#90CAF9'
 };
+
+// Lignes agrégées de la matrice de risque, mémorisées pour permettre le filtrage
+// sans recalcul ni ré-appel à Grist.
+let allMatrixRows = [];
 
 // ============================================================
 // Entrée : déclaration du widget auprès de Grist
@@ -378,11 +427,11 @@ function renderDonut(vms) {
 }
 
 // ============================================================
-// Matrice de risque : agrégation par OS
+// Matrice de risque : agrégation par OS + filtres Criticité/OS
 // ============================================================
-function renderMatrix(vms, osRef) {
-  const tbl = document.getElementById('matrixTable');
+const CRIT_ORDER = {'Critique':0,'Élevé':1,'Moyen':2,'À confirmer':3,'Faible':4,'Inconnu':5};
 
+function renderMatrix(vms, osRef) {
   // Map rowId OS -> données référentiel
   const osById = {};
   for (const o of osRef) osById[o.id] = o;
@@ -397,7 +446,9 @@ function renderMatrix(vms, osRef) {
       matrix[refId] = {
         os: o.OS || '(inconnu)',
         statut: o.Statut || '',
-        criticite: o.Criticite || '',
+        // Une criticité absente/vide dans OS_Referentiel est traitée comme "Inconnu"
+        // plutôt que comme une chaîne vide (évite un badge sans classe CSS correspondante).
+        criticite: o.Criticite || 'Inconnu',
         classification: o.Classification || '',
         detail: o.Detail_Securite || '',
         nb: 0
@@ -406,15 +457,49 @@ function renderMatrix(vms, osRef) {
     matrix[refId].nb++;
   }
 
-  // Trier par nb VM décroissant, criticité prioritaire
-  const critOrder = {'Critique':0,'Élevé':1,'Moyen':2,'À confirmer':3,'Faible':4,'Inconnu':5};
-  const rows = Object.values(matrix).sort((a,b) => {
-    const c = (critOrder[a.criticite] ?? 9) - (critOrder[b.criticite] ?? 9);
+  // Trier par criticité prioritaire, puis nb VM décroissant
+  allMatrixRows = Object.values(matrix).sort((a,b) => {
+    const c = (CRIT_ORDER[a.criticite] ?? 9) - (CRIT_ORDER[b.criticite] ?? 9);
     if (c !== 0) return c;
     return b.nb - a.nb;
   });
 
-  tbl.innerHTML = `
+  populateFilterOptions();
+  renderMatrixTable();
+}
+
+function populateFilterOptions() {
+  const critSelect = document.getElementById('filterCriticite');
+  const osSelect = document.getElementById('filterOS');
+  const prevCrit = critSelect.value;
+  const prevOs = osSelect.value;
+
+  const critValues = [...new Set(allMatrixRows.map(r => r.criticite))]
+    .sort((a, b) => (CRIT_ORDER[a] ?? 9) - (CRIT_ORDER[b] ?? 9));
+  const osValues = [...new Set(allMatrixRows.map(r => r.os))]
+    .sort((a, b) => a.localeCompare(b, 'fr'));
+
+  critSelect.innerHTML = '<option value="">Toutes</option>' +
+    critValues.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  osSelect.innerHTML = '<option value="">Tous</option>' +
+    osValues.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('');
+
+  // Restaure la sélection précédente si elle existe toujours dans les nouvelles données
+  if (critValues.includes(prevCrit)) critSelect.value = prevCrit;
+  if (osValues.includes(prevOs)) osSelect.value = prevOs;
+}
+
+function renderMatrixTable() {
+  const tbl = document.getElementById('matrixTable');
+  const critFilter = document.getElementById('filterCriticite').value;
+  const osFilter = document.getElementById('filterOS').value;
+
+  const rows = allMatrixRows.filter(r =>
+    (!critFilter || r.criticite === critFilter) &&
+    (!osFilter || r.os === osFilter)
+  );
+
+  const theadHtml = `
     <thead>
       <tr>
         <th>Criticité</th>
@@ -423,10 +508,24 @@ function renderMatrix(vms, osRef) {
         <th style="width:80px;">Nb VM</th>
       </tr>
     </thead>
+  `;
+
+  if (!rows.length) {
+    tbl.innerHTML = theadHtml + `
+      <tbody>
+        <tr><td colspan="4" style="text-align:center;color:#6a737d;padding:14px;">
+          Aucun OS ne correspond aux filtres sélectionnés.
+        </td></tr>
+      </tbody>
+    `;
+    return;
+  }
+
+  tbl.innerHTML = theadHtml + `
     <tbody>
       ${rows.map(r => `
         <tr>
-          <td><span class="crit-badge crit-${escapeAttr(r.criticite.replace(/\s/g,''))}">${escapeHtml(r.criticite || '—')}</span></td>
+          <td><span class="crit-badge crit-${escapeAttr(r.criticite.replace(/\s/g,''))}">${escapeHtml(r.criticite)}</span></td>
           <td>${escapeHtml(r.os)}</td>
           <td>${escapeHtml(r.statut)}${r.detail ? ' <span style="color:#6a737d;">('+escapeHtml(r.detail)+')</span>' : ''}</td>
           <td class="num">${r.nb}</td>
@@ -473,6 +572,17 @@ function escapeHtml(s) {
 function escapeAttr(s) {
   return escapeHtml(s).replace(/[^a-zA-Z0-9-_]/g, '');
 }
+
+// ============================================================
+// Interactions des filtres (Criticité / OS)
+// ============================================================
+document.getElementById('filterCriticite').addEventListener('change', renderMatrixTable);
+document.getElementById('filterOS').addEventListener('change', renderMatrixTable);
+document.getElementById('resetFilters').addEventListener('click', () => {
+  document.getElementById('filterCriticite').value = '';
+  document.getElementById('filterOS').value = '';
+  renderMatrixTable();
+});
 </script>
 </body>
 </html>
